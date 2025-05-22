@@ -6,7 +6,13 @@ import threading
 from flask import Flask
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from shared.pipeline_utils import set_file_status, get_files_by_status, set_file_error, notify_all, clean_string
+from shared.pipeline_utils import (
+    set_file_status,
+    get_files_by_status,
+    set_file_error,
+    notify_all,
+    clean_string,
+)
 import traceback
 import datetime
 
@@ -14,13 +20,16 @@ import datetime
 INPUT_DIR = os.environ.get("INPUT_DIR", "/input")
 QUEUE_DIR = os.environ.get("QUEUE_DIR", "/queue")
 LOGS_DIR = os.environ.get("LOGS_DIR", "/logs")
-STABILITY_CHECKS = int(os.environ.get("FILE_STABILITY_CHECKS", 4))  # Number of consecutive stable checks before moving
+STABILITY_CHECKS = int(
+    os.environ.get("FILE_STABILITY_CHECKS", 4)
+)  # Number of consecutive stable checks before moving
+
 
 class MP3Handler(FileSystemEventHandler):
     """Watches for new .mp3 files and queues them for processing if stable."""
 
     def on_created(self, event):
-        if event.is_directory or not event.src_path.endswith('.mp3'):
+        if event.is_directory or not event.src_path.endswith(".mp3"):
             return
         fname = os.path.basename(event.src_path)
         fname = clean_string(fname)
@@ -54,7 +63,11 @@ class MP3Handler(FileSystemEventHandler):
             timestamp = datetime.datetime.now().isoformat()
             error_details = f"{timestamp}\nException: {e}\n\nTraceback:\n{tb}"
             set_file_error(fname, error_details)
-            notify_all("Karaoke Pipeline Error", f"Error in watcher for {fname} at {timestamp}:\n{e}")
+            notify_all(
+                "Karaoke Pipeline Error",
+                f"Error in watcher for {fname} at {timestamp}:\n{e}",
+            )
+
 
 def run_watcher():
     """Main loop: start watchdog observer on INPUT_DIR for new mp3 files."""
@@ -71,12 +84,15 @@ def run_watcher():
         observer.stop()
     observer.join()
 
+
 app = Flask(__name__)
+
 
 @app.route("/health")
 def health():
     """Healthcheck endpoint for Docker/Compose health probe."""
     return "ok", 200
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

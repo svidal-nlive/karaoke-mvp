@@ -10,6 +10,7 @@ Pipeline utility functions shared across all karaoke-mvp services.
 
 import os
 import logging
+
 logging.basicConfig(level=logging.INFO)
 import redis
 import requests
@@ -34,13 +35,15 @@ REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
 # -------- REDIS CLIENT (singleton) --------
 redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
+
 # -------- STRING SANITIZATION --------
 def clean_string(s):
     """Sanitize input for safe filesystem usage."""
     if not isinstance(s, str):
         s = str(s)
     # Remove null bytes, slashes, and whitespace
-    return s.replace('\x00', '').replace('/', '-').replace('\\', '-').strip()
+    return s.replace("\x00", "").replace("/", "-").replace("\\", "-").strip()
+
 
 # -------- STATUS & ERROR MANAGEMENT --------
 def set_file_status(filename, status, error=None, extra=None):
@@ -54,6 +57,7 @@ def set_file_status(filename, status, error=None, extra=None):
     # Use hset with mapping (hmset is deprecated in redis-py >= 3.5)
     redis_client.hset(key, mapping=value)
 
+
 def get_files_by_status(status):
     """List all files in Redis with the given status."""
     all_keys = redis_client.keys("file:*")
@@ -64,9 +68,11 @@ def get_files_by_status(status):
             files.append(key.replace("file:", ""))
     return files
 
+
 def set_file_error(filename, error):
     """Set status to error, attach error details."""
     set_file_status(filename, "error", error=error)
+
 
 def clear_file_error(filename):
     """Remove error status from file (set to queued, clear retries)."""
@@ -75,6 +81,7 @@ def clear_file_error(filename):
     for stage in ["metadata", "splitter", "packager", "organizer"]:
         redis_client.delete(f"{stage}_retries:{filename}")
     redis_client.hdel(key, "error")
+
 
 # -------- NOTIFICATIONS --------
 def send_telegram_message(message):
@@ -86,6 +93,7 @@ def send_telegram_message(message):
         except Exception:
             pass
 
+
 def send_slack_message(message):
     if SLACK_WEBHOOK_URL:
         try:
@@ -93,14 +101,15 @@ def send_slack_message(message):
         except Exception:
             pass
 
+
 def send_email(subject, message):
     if NOTIFY_EMAILS and SMTP_SERVER and SMTP_USERNAME and SMTP_PASSWORD:
         try:
             msg = EmailMessage()
             msg.set_content(message)
-            msg['Subject'] = subject
-            msg['From'] = SMTP_USERNAME
-            msg['To'] = [e.strip() for e in NOTIFY_EMAILS.split(",")]
+            msg["Subject"] = subject
+            msg["From"] = SMTP_USERNAME
+            msg["To"] = [e.strip() for e in NOTIFY_EMAILS.split(",")]
             with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
                 server.starttls()
                 server.login(SMTP_USERNAME, SMTP_PASSWORD)
@@ -108,15 +117,18 @@ def send_email(subject, message):
         except Exception:
             pass
 
+
 def notify_all(subject, message):
     send_telegram_message(message)
     send_slack_message(message)
     send_email(subject, message)
 
+
 # -------- RETRY UTILITIES --------
 def get_retry_count(stage, filename):
     """Return the current retry count for this stage/filename."""
     return int(redis_client.get(f"{stage}_retries:{filename}") or 0)
+
 
 def increment_retry(stage, filename):
     """Increment and return the retry count for this stage/filename."""
@@ -124,12 +136,16 @@ def increment_retry(stage, filename):
     redis_client.set(f"{stage}_retries:{filename}", retries)
     return retries
 
+
 def reset_retry(stage, filename):
     """Clear retry counter for stage/filename."""
     redis_client.delete(f"{stage}_retries:{filename}")
 
+
 # -------- GENERIC AUTO-RETRY LOGIC --------
-def handle_auto_retry(stage, filename, func, max_retries=3, retry_delay=5, notify_fail=True):
+def handle_auto_retry(
+    stage, filename, func, max_retries=3, retry_delay=5, notify_fail=True
+):
     """
     Run func(); if it raises, auto-retry up to max_retries.
     - stage: str, e.g. 'splitter'
@@ -145,17 +161,20 @@ def handle_auto_retry(stage, filename, func, max_retries=3, retry_delay=5, notif
             retries = increment_retry(stage, filename)
             tb = traceback.format_exc()
             timestamp = datetime.datetime.now().isoformat()
-            error_details = f"{timestamp}\nException: {e} (attempt {retries})\n\nTraceback:\n{tb}"
+            error_details = (
+                f"{timestamp}\nException: {e} (attempt {retries})\n\nTraceback:\n{tb}"
+            )
             set_file_error(filename, error_details)
             if attempt < max_retries:
                 time.sleep(retry_delay)
             elif notify_fail:
                 notify_all(
                     f"Pipeline Error [{stage}]",
-                    f"❌ {stage.capitalize()} FAILED for {filename} after {max_retries} retries\n\n{e}\n\n{tb}"
+                    f"❌ {stage.capitalize()} FAILED for {filename} after {max_retries} retries\n\n{e}\n\n{tb}",
                 )
             if attempt == max_retries:
                 raise
+
 
 # -------- FILE STATUS SUMMARY --------
 def get_file_status(filename):
@@ -165,11 +184,11 @@ def get_file_status(filename):
     return {
         "filename": filename,
         "status": data.get("status", "unknown"),
-        "last_error": data.get("error", "")
+        "last_error": data.get("error", ""),
     }
+
 
 # -------- HEALTHCHECK UTILS --------
 def health_response():
     """Simple Flask healthcheck endpoint."""
     return "ok", 200
-

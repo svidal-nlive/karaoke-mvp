@@ -12,7 +12,7 @@ from shared.pipeline_utils import (
     notify_all,
     clean_string,
     redis_client,
-    handle_auto_retry
+    handle_auto_retry,
 )
 import traceback
 import datetime
@@ -32,15 +32,24 @@ def extract_metadata(mp3_path):
         audio = MP3(mp3_path)
         tags = audio.tags
         meta = {}
-        meta['TIT2'] = clean_string(tags.get('TIT2', 'Unknown Title')) if tags else 'Unknown Title'
-        meta['TPE1'] = clean_string(tags.get('TPE1', 'Unknown Artist')) if tags else 'Unknown Artist'
-        meta['TALB'] = clean_string(tags.get('TALB', 'Unknown Album')) if tags else 'Unknown Album'
+        meta["TIT2"] = (
+            clean_string(tags.get("TIT2", "Unknown Title")) if tags else "Unknown Title"
+        )
+        meta["TPE1"] = (
+            clean_string(tags.get("TPE1", "Unknown Artist"))
+            if tags
+            else "Unknown Artist"
+        )
+        meta["TALB"] = (
+            clean_string(tags.get("TALB", "Unknown Album")) if tags else "Unknown Album"
+        )
         if tags:
-            meta['TRCK'] = clean_string(tags.get('TRCK', ''))
+            meta["TRCK"] = clean_string(tags.get("TRCK", ""))
         return meta
     except Exception as e:
         logging.error(f"Metadata extraction failed for {mp3_path}: {e}")
         return None
+
 
 def run_extractor():
     """
@@ -60,8 +69,10 @@ def run_extractor():
             def extract_and_store():
                 meta = extract_metadata(file_path)
                 if meta is not None:
-                    meta_path = os.path.join(META_DIR, os.path.splitext(file)[0] + '.mp3.json')
-                    with open(meta_path, 'w') as f:
+                    meta_path = os.path.join(
+                        META_DIR, os.path.splitext(file)[0] + ".mp3.json"
+                    )
+                    with open(meta_path, "w") as f:
                         json.dump(meta, f)
                     set_file_status(file, "metadata_extracted")
                     redis_client.delete(f"metadata_retries:{file}")
@@ -75,25 +86,31 @@ def run_extractor():
                     file,
                     func=extract_and_store,
                     max_retries=MAX_RETRIES,
-                    retry_delay=RETRY_DELAY
+                    retry_delay=RETRY_DELAY,
                 )
             except Exception as e:
                 tb = traceback.format_exc()
                 timestamp = datetime.datetime.now().isoformat()
                 error_details = f"{timestamp}\nException: {e}\n\nTraceback:\n{tb}"
                 set_file_error(file, error_details)
-                notify_all("Karaoke Pipeline Error", f"❌ Metadata extraction failed for {file}: {e}")
+                notify_all(
+                    "Karaoke Pipeline Error",
+                    f"❌ Metadata extraction failed for {file}: {e}",
+                )
                 redis_client.incr(f"metadata_retries:{file}")
         time.sleep(2)
 
+
 app = Flask(__name__)
+
 
 @app.route("/health")
 def health():
     """Healthcheck endpoint for Docker health probe."""
     return "ok", 200
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     t = threading.Thread(target=run_extractor, daemon=True)
     t.start()

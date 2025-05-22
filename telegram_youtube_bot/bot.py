@@ -4,7 +4,12 @@ import json
 import asyncio
 from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ConversationHandler,
+    ContextTypes,
 )
 import yt_dlp
 import musicbrainzngs
@@ -21,23 +26,29 @@ TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 # --- State tracking
 AWAITING_METADATA = range(1)
 
+
 # --- Helper: Download audio
 def download_youtube_audio(url, output_dir=INPUT_DIR):
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": os.path.join(output_dir, "%(title)s.%(ext)s"),
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }
+        ],
         "quiet": True,
-        "noplaylist": True
+        "noplaylist": True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info).replace(".webm", ".mp3").replace(".m4a", ".mp3")
+        filename = (
+            ydl.prepare_filename(info).replace(".webm", ".mp3").replace(".m4a", ".mp3")
+        )
         return filename, info.get("title", "")
+
 
 # --- Helper: Save metadata JSON directly to /metadata/json/
 def save_metadata_json(base_name, metadata):
@@ -47,15 +58,22 @@ def save_metadata_json(base_name, metadata):
         json.dump(metadata, f)
     return json_path
 
+
 # --- Helper: Fuzzy search with MusicBrainz
 async def musicbrainz_search(title, artist=""):
     musicbrainzngs.set_useragent("KaraokePipeline", "1.0", "https://yourdomain.com")
     try:
-        results = musicbrainzngs.search_recordings(recording=title, artist=artist, limit=5)
+        results = musicbrainzngs.search_recordings(
+            recording=title, artist=artist, limit=5
+        )
         options = []
         for rec in results["recording-list"]:
             rec_title = rec.get("title", "Unknown")
-            rec_artist = rec["artist-credit"][0]["artist"]["name"] if rec.get("artist-credit") else "Unknown"
+            rec_artist = (
+                rec["artist-credit"][0]["artist"]["name"]
+                if rec.get("artist-credit")
+                else "Unknown"
+            )
             rec_album = rec.get("release-list", [{}])[0].get("title", "Unknown Album")
             options.append((rec_title, rec_artist, rec_album))
         return options
@@ -63,11 +81,13 @@ async def musicbrainz_search(title, artist=""):
         logging.warning(f"MusicBrainz search failed: {e}")
         return []
 
+
 # --- Command Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Send /make <youtube-url> to start processing a new song."
     )
+
 
 async def make(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -105,6 +125,7 @@ async def make(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error: {e}")
         return ConversationHandler.END
 
+
 async def receive_metadata(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     base = context.user_data.get("base")
@@ -120,7 +141,9 @@ async def receive_metadata(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text.lower() == "manual" or text.count(";") == 2:
         if text.lower() == "manual":
-            await update.message.reply_text("Send metadata in format:\nTitle;Artist;Album")
+            await update.message.reply_text(
+                "Send metadata in format:\nTitle;Artist;Album"
+            )
             return AWAITING_METADATA
         parts = [p.strip() for p in text.split(";")]
         if not is_valid_metadata(parts):
@@ -131,7 +154,7 @@ async def receive_metadata(update: Update, context: ContextTypes.DEFAULT_TYPE):
         metadata = {
             "TIT2": parts[0],
             "TPE1": parts[1],
-            "TALB": parts[2] or "YouTube Music"
+            "TALB": parts[2] or "YouTube Music",
         }
     elif text.isdigit() and 1 <= int(text) <= len(options):
         sel = int(text) - 1
@@ -156,9 +179,11 @@ async def receive_metadata(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Cancelled.", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
+
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -166,7 +191,9 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("make", make)],
         states={
-            AWAITING_METADATA: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_metadata)],
+            AWAITING_METADATA: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_metadata)
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
@@ -177,6 +204,7 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()

@@ -6,7 +6,7 @@ from shared.pipeline_utils import (
     redis_client,
     get_files_by_status,
     set_file_status,
-    clean_string
+    clean_string,
 )
 
 # --- Logging for troubleshooting ---
@@ -19,10 +19,11 @@ PIPELINE_STAGES = [
     ("split", "stems", ""),
     ("packaged", "output", ".mp3"),
     ("organized", "organized", ".mp3"),
-    ("error", "queue", ".error")
+    ("error", "queue", ".error"),
 ]
 
 DIRS = {k: os.environ.get(k.upper() + "_DIR", f"/{v}") for k, v, _ in PIPELINE_STAGES}
+
 
 def list_files(directory, suffix):
     """List files in directory with optional suffix filtering."""
@@ -32,6 +33,7 @@ def list_files(directory, suffix):
         return [f for f in os.listdir(directory) if f.endswith(suffix)]
     else:
         return os.listdir(directory)
+
 
 def get_file_status(filename):
     """Return status and last error for the given file from Redis and file system."""
@@ -49,15 +51,18 @@ def get_file_status(filename):
         "filename": filename,
         "stages": stages,
         "status": status,
-        "last_error": last_error
+        "last_error": last_error,
     }
 
+
 app = Flask(__name__)
+
 
 @app.route("/health")
 def health():
     """Healthcheck endpoint."""
     return "ok", 200
+
 
 @app.route("/status")
 def status():
@@ -68,11 +73,13 @@ def status():
     file_statuses = [get_file_status(f"{b}.mp3") for b in all_bases]
     return jsonify({"files": file_statuses})
 
+
 @app.route("/error-files")
 def error_files():
     error_files = get_files_by_status("error")
     details = [get_file_status(f) for f in error_files]
     return jsonify({"error_files": details})
+
 
 @app.route("/retry", methods=["POST"])
 def retry_file():
@@ -89,11 +96,13 @@ def retry_file():
     redis_client.hdel(filekey, "error")
     return jsonify({"message": f"File {filename} reset to queued and retries cleared."})
 
+
 @app.route("/pipeline-health")
 def pipeline_health():
     stages = ["queued", "metadata_extracted", "split", "packaged", "organized", "error"]
     counts = {stage: len(get_files_by_status(stage)) for stage in stages}
     return jsonify(counts)
+
 
 @app.route("/error-details/<filename>")
 def error_details(filename):
@@ -103,7 +112,9 @@ def error_details(filename):
         return jsonify({"filename": filename, "error": "No error found."}), 404
     return jsonify({"filename": filename, "error": error})
 
+
 start_time = time.time()
+
 
 @app.route("/metrics")
 def metrics():
@@ -111,10 +122,11 @@ def metrics():
     metrics_lines = []
     for stage in stages:
         count = len(get_files_by_status(stage))
-        metrics_lines.append(f'karaoke_files_{stage} {count}')
+        metrics_lines.append(f"karaoke_files_{stage} {count}")
     uptime = int(time.time() - start_time)
-    metrics_lines.append(f'karaoke_statusapi_uptime_seconds {uptime}')
+    metrics_lines.append(f"karaoke_statusapi_uptime_seconds {uptime}")
     return Response("\n".join(metrics_lines), mimetype="text/plain")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)

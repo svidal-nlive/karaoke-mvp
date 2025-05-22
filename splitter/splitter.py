@@ -13,19 +13,20 @@ from shared.pipeline_utils import (
     notify_all,
     clean_string,
     redis_client,
-    handle_auto_retry
+    handle_auto_retry,
 )
 import traceback
 import datetime
 
 # --- Config: set via ENV or defaults ---
-QUEUE_DIR = os.environ.get('QUEUE_DIR', '/queue')
-STEMS_DIR = os.environ.get('STEMS_DIR', '/stems')
+QUEUE_DIR = os.environ.get("QUEUE_DIR", "/queue")
+STEMS_DIR = os.environ.get("STEMS_DIR", "/stems")
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
 RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 10))  # seconds
 CHUNK_LENGTH_MS = int(os.environ.get("CHUNK_LENGTH_MS", 30000))  # ms
 
 logging.basicConfig(level=logging.INFO)
+
 
 def process_file(file_path, song_name):
     """Split an MP3 into stems in chunks, merge results, write output."""
@@ -43,22 +44,29 @@ def process_file(file_path, song_name):
                     os.makedirs(output_dir, exist_ok=True)
                     result = subprocess.run(
                         [
-                            "spleeter", "separate",
-                            "-p", "spleeter:2stems",
-                            "-o", output_dir,
-                            chunk_path
+                            "spleeter",
+                            "separate",
+                            "-p",
+                            "spleeter:2stems",
+                            "-o",
+                            output_dir,
+                            chunk_path,
                         ],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True
+                        text=True,
                     )
                     if result.returncode != 0:
-                        raise RuntimeError(f"Spleeter error (chunk {idx}): {result.stderr}")
+                        raise RuntimeError(
+                            f"Spleeter error (chunk {idx}): {result.stderr}"
+                        )
                     stem_dir = os.path.join(output_dir, f"chunk_{idx}")
                     vocals_path = os.path.join(stem_dir, "vocals.wav")
                     acc_path = os.path.join(stem_dir, "accompaniment.wav")
                     if not (os.path.exists(vocals_path) and os.path.exists(acc_path)):
-                        raise FileNotFoundError(f"Missing stems for chunk {idx}: {vocals_path}, {acc_path}")
+                        raise FileNotFoundError(
+                            f"Missing stems for chunk {idx}: {vocals_path}, {acc_path}"
+                        )
                     vocals_chunk = AudioSegment.from_wav(vocals_path)
                     accompaniment_chunk = AudioSegment.from_wav(acc_path)
                     vocals += vocals_chunk
@@ -66,13 +74,16 @@ def process_file(file_path, song_name):
                 out_dir = os.path.join(STEMS_DIR, song_name)
                 os.makedirs(out_dir, exist_ok=True)
                 vocals.export(os.path.join(out_dir, "vocals.wav"), format="wav")
-                accompaniment.export(os.path.join(out_dir, "accompaniment.wav"), format="wav")
+                accompaniment.export(
+                    os.path.join(out_dir, "accompaniment.wav"), format="wav"
+                )
             return True
         except Exception as e:
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY)
             else:
                 return str(e)
+
 
 def main():
     while True:
@@ -89,7 +100,9 @@ def main():
                 if result is True:
                     set_file_status(file, "split")
                     redis_client.delete(f"splitter_retries:{file}")
-                    notify_all("Karaoke Pipeline Success", f"✅ Split completed for {file}")
+                    notify_all(
+                        "Karaoke Pipeline Success", f"✅ Split completed for {file}"
+                    )
                 else:
                     raise Exception(result)
                 return True
@@ -100,16 +113,19 @@ def main():
                     file,
                     func=process_func,
                     max_retries=MAX_RETRIES,
-                    retry_delay=RETRY_DELAY
+                    retry_delay=RETRY_DELAY,
                 )
             except Exception as e:
                 tb = traceback.format_exc()
                 timestamp = datetime.datetime.now().isoformat()
                 error_details = f"{timestamp}\nSplitter error: {e}\n\nTraceback:\n{tb}"
                 set_file_error(file, error_details)
-                notify_all("Karaoke Pipeline Error", f"❌ Splitter failed for {file}: {e}")
+                notify_all(
+                    "Karaoke Pipeline Error", f"❌ Splitter failed for {file}: {e}"
+                )
                 redis_client.incr(f"splitter_retries:{file}")
         time.sleep(5)
+
 
 if __name__ == "__main__":
     main()

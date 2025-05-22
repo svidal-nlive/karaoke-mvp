@@ -13,7 +13,7 @@ from shared.pipeline_utils import (
     notify_all,
     clean_string,
     redis_client,
-    handle_auto_retry
+    handle_auto_retry,
 )
 import traceback
 import datetime
@@ -27,14 +27,19 @@ RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 5))
 
 logging.basicConfig(level=logging.INFO)
 
+
 def robust_load_metadata(meta_path):
     """Load metadata JSON, falling back to defaults if not present."""
-    fallback = {'TIT2': 'Unknown Title', 'TPE1': 'Unknown Artist', 'TALB': 'Unknown Album'}
+    fallback = {
+        "TIT2": "Unknown Title",
+        "TPE1": "Unknown Artist",
+        "TALB": "Unknown Album",
+    }
     if not os.path.exists(meta_path):
         logging.warning(f"Metadata file missing: {meta_path}")
         return fallback
     try:
-        with open(meta_path, 'r', encoding='utf-8') as f:
+        with open(meta_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
         for k in fallback:
             if k not in meta or not meta[k]:
@@ -43,6 +48,7 @@ def robust_load_metadata(meta_path):
     except Exception as e:
         logging.error(f"Metadata JSON error in {meta_path}: {e}")
         return fallback
+
 
 def clean_mp3_tags(mp3_path, meta):
     audio = MP3(mp3_path)
@@ -53,24 +59,32 @@ def clean_mp3_tags(mp3_path, meta):
         audio.add_tags()
     except Exception:
         pass
-    audio.tags.add(TIT2(encoding=3, text=meta.get('TIT2')))
-    audio.tags.add(TPE1(encoding=3, text=meta.get('TPE1')))
-    audio.tags.add(TALB(encoding=3, text=meta.get('TALB')))
+    audio.tags.add(TIT2(encoding=3, text=meta.get("TIT2")))
+    audio.tags.add(TPE1(encoding=3, text=meta.get("TPE1")))
+    audio.tags.add(TALB(encoding=3, text=meta.get("TALB")))
     audio.save()
+
 
 def apply_metadata(instrumental_path, meta_path, out_path):
     audio = AudioSegment.from_wav(instrumental_path)
     audio.export(out_path, format="mp3")
     meta = robust_load_metadata(meta_path)
     clean_mp3_tags(out_path, meta)
-    cover_path = meta_path.replace('.json', '_cover.jpg')
+    cover_path = meta_path.replace(".json", "_cover.jpg")
     if os.path.exists(cover_path):
         audiofile = MP3(out_path, ID3=ID3)
-        with open(cover_path, 'rb') as albumart:
-            audiofile.tags.add(APIC(
-                encoding=3, mime='image/jpeg', type=3, desc=u'Cover', data=albumart.read()
-            ))
+        with open(cover_path, "rb") as albumart:
+            audiofile.tags.add(
+                APIC(
+                    encoding=3,
+                    mime="image/jpeg",
+                    type=3,
+                    desc="Cover",
+                    data=albumart.read(),
+                )
+            )
         audiofile.save()
+
 
 def run_packager():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -78,7 +92,7 @@ def run_packager():
         files = get_files_by_status("split")
         for file in files:
             song_name = clean_string(os.path.splitext(file)[0])
-            inst_path = os.path.join(STEMS_DIR, song_name, 'accompaniment.wav')
+            inst_path = os.path.join(STEMS_DIR, song_name, "accompaniment.wav")
             meta_path = os.path.join(META_DIR, f"{song_name}.mp3.json")
             out_path = os.path.join(OUTPUT_DIR, f"{song_name}_karaoke.mp3")
 
@@ -96,7 +110,10 @@ def run_packager():
                 apply_metadata(inst_path, meta_path, out_path)
                 set_file_status(file, "packaged")
                 redis_client.delete(f"packager_retries:{file}")
-                notify_all("Karaoke Pipeline Success", f"✅ Karaoke track produced: {os.path.basename(out_path)}")
+                notify_all(
+                    "Karaoke Pipeline Success",
+                    f"✅ Karaoke track produced: {os.path.basename(out_path)}",
+                )
 
             try:
                 handle_auto_retry(
@@ -104,16 +121,20 @@ def run_packager():
                     file,
                     func=package_func,
                     max_retries=MAX_RETRIES,
-                    retry_delay=RETRY_DELAY
+                    retry_delay=RETRY_DELAY,
                 )
             except Exception as e:
                 tb = traceback.format_exc()
                 timestamp = datetime.datetime.now().isoformat()
                 error_details = f"{timestamp}\nException: {e}\n\nTraceback:\n{tb}"
                 set_file_error(file, error_details)
-                notify_all("Karaoke Pipeline Error", f"❌ Packaging failed for {song_name}: {e}")
+                notify_all(
+                    "Karaoke Pipeline Error",
+                    f"❌ Packaging failed for {song_name}: {e}",
+                )
                 redis_client.incr(f"packager_retries:{file}")
         time.sleep(2)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_packager()
