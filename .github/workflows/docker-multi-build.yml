@@ -9,7 +9,7 @@ on:
     - cron: '0 3 * * *' # Nightly build at 3AM UTC
 
 env:
-  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }} # CHANGE THIS TO YOUR DOCKERHUB USERNAME
+  DOCKERHUB_USER: nlivestudent
 
 jobs:
   build-and-push:
