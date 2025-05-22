@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  watcher:
+    command: ["pytest", "."]
+    environment:
+      - TEST_MODE=1
+    restart: "no"
+
+  metadata:
+    command: ["pytest", "."]
+    environment:
+      - TEST_MODE=1
+    restart: "no"
+
+  splitter:
+    command: ["pytest", "."]
+    environment:
+      - TEST_MODE=1
+    restart: "no"
+
+  packager:
+    command: ["pytest", "."]
+    environment:
+      - TEST_MODE=1
+    restart: "no"
+
+  organizer:
+    command: ["pytest", "."]
+    environment:
+      - TEST_MODE=1
+    restart: "no"
+
+  telegram_youtube_bot:
+    command: ["pytest", "."]
+    environment:
+      - TEST_MODE=1
+    restart: "no"
+
+  status-api:
+    command: ["pytest", "."]
+    environment:
+      - TEST_MODE=1
+    restart: "no"
+
+  maintenance:
+    command: ["pytest", "."]
+    environment:
+      - TEST_MODE=1
+    restart: "no"
+
+  # Optionally, use mock/fake services for Redis or Telegram in CI
+  redis:
+    image: redis:7-alpine
+    restart: "no"

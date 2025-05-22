@@ -1,0 +1,131 @@
+version: "3.8"
+
+services:
+  watcher:
+    image: nlivestudent/karaoke-watcher:latest
+    restart: always
+    environment:
+      - ENV=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    volumes:
+      - input:/input
+      - queue:/queue
+      - logs:/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  metadata:
+    image: nlivestudent/karaoke-metadata:latest
+    restart: always
+    environment:
+      - ENV=production
+    volumes:
+      - metadata:/metadata
+      - shared:/shared
+      - logs:/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  splitter:
+    image: nlivestudent/karaoke-splitter:latest
+    restart: always
+    environment:
+      - ENV=production
+    volumes:
+      - input:/input
+      - stems:/stems
+      - models:/models
+      - logs:/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  packager:
+    image: nlivestudent/karaoke-packager:latest
+    restart: always
+    environment:
+      - ENV=production
+    volumes:
+      - stems:/stems
+      - output:/output
+      - logs:/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  organizer:
+    image: nlivestudent/karaoke-organizer:latest
+    restart: always
+    environment:
+      - ENV=production
+    volumes:
+      - output:/output
+      - organized:/organized
+      - logs:/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  telegram_youtube_bot:
+    image: nlivestudent/karaoke-telegram-bot:latest
+    restart: always
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - ENV=production
+    depends_on:
+      - redis
+
+  status-api:
+    image: nlivestudent/karaoke-status-api:latest
+    restart: always
+    environment:
+      - ENV=production
+    ports:
+      - "5001:5001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  maintenance:
+    image: nlivestudent/karaoke-maintenance:latest
+    restart: unless-stopped
+    environment:
+      - ENV=production
+    volumes:
+      - logs:/logs
+      - input:/input
+      - output:/output
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis:/data
+
+volumes:
+  input:
+  queue:
+  logs:
+  metadata:
+  shared:
+  stems:
+  models:
+  output:
+  organized:
+  redis:

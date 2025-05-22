@@ -18,13 +18,17 @@ from shared.pipeline_utils import (
 import traceback
 import datetime
 
+# --- Config: override via ENV ---
 STEMS_DIR = os.environ.get("STEMS_DIR", "/stems")
 META_DIR = os.environ.get("META_DIR", "/metadata/json")
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/output")
-MAX_RETRIES = 3
-RETRY_DELAY = 5
+MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
+RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 5))
+
+logging.basicConfig(level=logging.INFO)
 
 def robust_load_metadata(meta_path):
+    """Load metadata JSON, falling back to defaults if not present."""
     fallback = {'TIT2': 'Unknown Title', 'TPE1': 'Unknown Artist', 'TALB': 'Unknown Album'}
     if not os.path.exists(meta_path):
         logging.warning(f"Metadata file missing: {meta_path}")

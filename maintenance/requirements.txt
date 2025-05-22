@@ -1,2 +1,2 @@
-redis
-requests
+redis==6.1.0
+requests==2.32.3

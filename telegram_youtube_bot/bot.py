@@ -1,6 +1,6 @@
 import os
-import json
 import logging
+import json
 import asyncio
 from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import (
@@ -9,9 +9,12 @@ from telegram.ext import (
 import yt_dlp
 import musicbrainzngs
 
-# --- Constants
-INPUT_DIR = "/input"
-META_DIR = "/metadata/json"
+# --- Logging for diagnostics ---
+logging.basicConfig(level=logging.INFO)
+
+# --- Constants, prefer ENV overrides for portability ---
+INPUT_DIR = os.environ.get("INPUT_DIR", "/input")
+META_DIR = os.environ.get("META_DIR", "/metadata/json")
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 

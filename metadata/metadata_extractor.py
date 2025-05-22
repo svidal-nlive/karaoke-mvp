@@ -1,4 +1,8 @@
-import os, json, logging, threading, time
+import os
+import json
+import logging
+import threading
+import time
 from flask import Flask
 from mutagen.mp3 import MP3
 from shared.pipeline_utils import (
@@ -15,10 +19,15 @@ import datetime
 
 QUEUE_DIR = os.environ.get("QUEUE_DIR", "/queue")
 META_DIR = os.environ.get("META_DIR", "/metadata/json")
-MAX_RETRIES = 3
-RETRY_DELAY = 5
+MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
+RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 5))
+
 
 def extract_metadata(mp3_path):
+    """
+    Extract MP3 metadata using mutagen.
+    Returns a dictionary of tags or None on failure.
+    """
     try:
         audio = MP3(mp3_path)
         tags = audio.tags
@@ -34,6 +43,10 @@ def extract_metadata(mp3_path):
         return None
 
 def run_extractor():
+    """
+    Main extractor loop. Processes files in 'queued' status,
+    extracts metadata, and writes to META_DIR as JSON.
+    """
     os.makedirs(META_DIR, exist_ok=True)
     while True:
         files = get_files_by_status("queued")
@@ -74,11 +87,14 @@ def run_extractor():
         time.sleep(2)
 
 app = Flask(__name__)
+
 @app.route("/health")
 def health():
+    """Healthcheck endpoint for Docker health probe."""
     return "ok", 200
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     t = threading.Thread(target=run_extractor, daemon=True)
     t.start()
     app.run(host="0.0.0.0", port=5000)

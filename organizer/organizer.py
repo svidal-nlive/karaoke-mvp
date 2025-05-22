@@ -3,6 +3,7 @@ import shutil
 import threading
 import time
 import json
+import logging
 from flask import Flask
 from shared.pipeline_utils import (
     set_file_status,
@@ -16,12 +17,16 @@ from shared.pipeline_utils import (
 import traceback
 import datetime
 
+# --- Config ---
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/output")
 ORG_DIR = os.environ.get("ORG_DIR", "/organized")
 META_DIR = os.environ.get("META_DIR", "/metadata/json")
-MAX_RETRIES = 3
+MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
+
+logging.basicConfig(level=logging.INFO)
 
 def get_metadata_from_json(file_path):
+    """Reads artist/album/title metadata from JSON file, or uses defaults."""
     base = os.path.basename(file_path)
     json_file = os.path.join(META_DIR, base.replace("_karaoke.mp3", ".mp3.json"))
     if os.path.exists(json_file):
@@ -37,6 +42,7 @@ def get_metadata_from_json(file_path):
     return "UnknownArtist", "UnknownAlbum", os.path.splitext(base)[0]
 
 def is_valid_karaoke_mp3(filename):
+    """Checks if a file is a karaoke mp3 by naming convention."""
     return filename.endswith('_karaoke.mp3')
 
 def organize_file(file_path, file):

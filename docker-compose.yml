@@ -1,64 +1,65 @@
-services:
-  # --- Init containers for volume permissions ---
+version: "3.8"
 
+# Global environment file, loaded by Compose and all services
+env_file:
+  - .env
+
+services:
+  # --- Permissions init jobs (run-once, do not restart) ---
   fix-input-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /input && chmod -R 775 /input"]
-    volumes:
-      - input:/input
+    command: ["sh", "-c", "chown -R ${PUID}:${PGID} /input && chmod -R 775 /input"]
+    volumes: [input:/input]
     restart: "no"
 
   fix-queue-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /queue && chmod -R 775 /queue"]
-    volumes:
-      - queue:/queue
+    command: ["sh", "-c", "chown -R ${PUID}:${PGID} /queue && chmod -R 775 /queue"]
+    volumes: [queue:/queue]
     restart: "no"
 
   fix-metadata-json-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /metadata/json && chmod -R 775 /metadata/json"]
-    volumes:
-      - metadata_json:/metadata/json
+    command: ["sh", "-c", "chown -R ${PUID}:${PGID} /metadata/json && chmod -R 775 /metadata/json"]
+    volumes: [metadata_json:/metadata/json]
     restart: "no"
 
   fix-stems-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /stems && chmod -R 775 /stems"]
-    volumes:
-      - stems:/stems
+    command: ["sh", "-c", "chown -R ${PUID}:${PGID} /stems && chmod -R 775 /stems"]
+    volumes: [stems:/stems]
     restart: "no"
 
   fix-output-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /output && chmod -R 775 /output"]
-    volumes:
-      - output:/output
+    command: ["sh", "-c", "chown -R ${PUID}:${PGID} /output && chmod -R 775 /output"]
+    volumes: [output:/output]
     restart: "no"
 
   fix-organized-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /organized && chmod -R 775 /organized"]
-    volumes:
-      - organized:/organized
+    command: ["sh", "-c", "chown -R ${PUID}:${PGID} /organized && chmod -R 775 /organized"]
+    volumes: [organized:/organized]
     restart: "no"
 
   fix-splitter-tmp-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /tmp && chmod -R 1777 /tmp"]
-    volumes:
-      - splitter_tmp:/tmp
+    command: ["sh", "-c", "chown -R ${PUID}:${PGID} /tmp && chmod -R 1777 /tmp"]
+    volumes: [splitter_tmp:/tmp]
     restart: "no"
 
   # --- Core pipeline services ---
-
   redis:
     image: redis:7-alpine
     container_name: karaoke_redis
     restart: unless-stopped
+    ports:
+      - "6379:6379"
 
   watcher:
-    build: ./watcher
+    build:
+      context: ./watcher
+      dockerfile: Dockerfile
     container_name: karaoke_watcher
     depends_on:
       - fix-input-permissions
@@ -67,15 +68,18 @@ services:
     volumes:
       - input:/input
       - queue:/queue
+      - shared_utils:/app/shared:ro
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       retries: 3
 
   metadata:
-    build: ./metadata
+    build:
+      context: ./metadata
+      dockerfile: Dockerfile
     container_name: karaoke_metadata
     depends_on:
       - fix-queue-permissions
@@ -85,8 +89,9 @@ services:
     volumes:
       - queue:/queue
       - metadata_json:/metadata/json
+      - shared_utils:/app/shared:ro
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     healthcheck:
@@ -95,7 +100,9 @@ services:
       retries: 3
 
   splitter:
-    build: ./splitter
+    build:
+      context: ./splitter
+      dockerfile: Dockerfile
     container_name: karaoke_splitter
     depends_on:
       - fix-queue-permissions
@@ -107,9 +114,10 @@ services:
       - queue:/queue
       - stems:/stems
       - splitter_tmp:/tmp
-      - ./models:/app/pretrained_models
+      - shared_utils:/app/shared:ro
+      - ./models:/app/pretrained_models:ro
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     healthcheck:
@@ -118,7 +126,9 @@ services:
       retries: 3
 
   packager:
-    build: ./packager
+    build:
+      context: ./packager
+      dockerfile: Dockerfile
     container_name: karaoke_packager
     depends_on:
       - fix-stems-permissions
@@ -130,8 +140,9 @@ services:
       - stems:/stems
       - metadata_json:/metadata/json
       - output:/output
+      - shared_utils:/app/shared:ro
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     healthcheck:
@@ -140,7 +151,9 @@ services:
       retries: 3
 
   organizer:
-    build: ./organizer
+    build:
+      context: ./organizer
+      dockerfile: Dockerfile
     container_name: karaoke_organizer
     depends_on:
       - fix-output-permissions
@@ -152,8 +165,9 @@ services:
       - output:/output
       - organized:/organized
       - metadata_json:/metadata/json
+      - shared_utils:/app/shared:ro
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST}
       - OUTPUT_DIR=/output
       - ORG_DIR=/organized
       - LOGS_DIR=/logs
@@ -166,7 +180,9 @@ services:
       retries: 3
 
   status-api:
-    build: ./status-api
+    build:
+      context: ./status-api
+      dockerfile: Dockerfile
     container_name: karaoke_status_api
     depends_on:
       - fix-input-permissions
@@ -186,15 +202,18 @@ services:
       - stems:/stems
       - output:/output
       - organized:/organized
+      - shared_utils:/app/shared:ro
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
       retries: 3
 
   maintenance:
-    build: ./maintenance
+    build:
+      context: ./maintenance
+      dockerfile: Dockerfile
     container_name: karaoke_maintenance
     depends_on:
       - redis
@@ -204,25 +223,39 @@ services:
       - output:/output
       - queue:/queue
       - organized:/organized
+      - shared_utils:/app/shared:ro
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     entrypoint: ["python", "cleanup.py"]
 
   maintenance-cron:
-    build: ./maintenance
+    build:
+      context: ./maintenance
+      dockerfile: Dockerfile
     container_name: karaoke_maintenance_cron
     depends_on:
       - redis
     volumes:
+      - metadata_json:/metadata/json
+      - stems:/stems
+      - output:/output
+      - queue:/queue
+      - organized:/organized
+      - shared_utils:/app/shared:ro
     environment:
-      - REDIS_HOST=redis
-      # (Add any required ENV for notifications)
+      - REDIS_HOST=${REDIS_HOST}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - CLEANUP_CRON_SCHEDULE=${CLEANUP_CRON_SCHEDULE}
     restart: unless-stopped
+    command: ["sh", "-c", "crontab /app/crontab && cron -f"]
 
   telegram_youtube_bot:
-    build: ./telegram_youtube_bot
+    build:
+      context: ./telegram_youtube_bot
+      dockerfile: Dockerfile
     container_name: telegram_youtube_bot
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -237,11 +270,11 @@ services:
       - fix-metadata-json-permissions
     restart: unless-stopped
 
-  # --- Support and UI containers (unchanged from your file) ---
+  # --- Optional: UI / external services ---
 
   tunnel:
-    container_name: tunnel
     image: cloudflare/cloudflared:latest
+    container_name: tunnel
     restart: unless-stopped
     command: tunnel run
     environment:
@@ -251,40 +284,39 @@ services:
     image: lscr.io/linuxserver/jellyfin:latest
     container_name: jellyfin
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/New_York
-      - JELLYFIN_PublishedServerUrl=http://http://172.28.221.43 #optional
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
     volumes:
       - ./jellyfin/library:/config
       - organized:/organized
     ports:
-      - 8096:8096
-      - 8920:8920 #optional
-      - 7359:7359/udp #optional
-      - 1900:1900/udp #optional
+      - "8096:8096"
+      - "8920:8920"
+      - "7359:7359/udp"
+      - "1900:1900/udp"
     restart: unless-stopped
 
   deemix:
     image: registry.gitlab.com/bockiii/deemix-docker
     container_name: deemix
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID}
+      - PGID=${PGID}
       - UMASK_SET=022
     volumes:
       - input:/downloads
       - ./deemix_config:/config
     ports:
-      - 6595:6595
+      - "6595:6595"
     restart: unless-stopped
 
   doublecommander:
     image: lscr.io/linuxserver/doublecommander:latest
     container_name: doublecommander
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID}
+      - PGID=${PGID}
     volumes:
       - input:/karaoke-mvp/input
       - output:/karaoke-mvp/output
@@ -296,15 +328,15 @@ services:
       - splitter_tmp:/karaoke-mvp/splitter-tmp
       - ./doublecommander_config:/config
     ports:
-      - 3000:3000
+      - "3000:3000"
     restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./alert.rules.yml:/etc/prometheus/alert.rules.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
     ports:
       - "9090:9090"
     restart: unless-stopped
@@ -322,12 +354,13 @@ services:
     image: prom/alertmanager:latest
     container_name: alertmanager
     volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
-      - ./telegram.tmpl:/etc/alertmanager/telegram.tmpl
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./telegram.tmpl:/etc/alertmanager/telegram.tmpl:ro
     ports:
       - "9093:9093"
     restart: unless-stopped
 
+# --- Named Volumes (persist data) ---
 volumes:
   input:
   queue:

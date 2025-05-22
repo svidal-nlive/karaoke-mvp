@@ -18,20 +18,23 @@ from shared.pipeline_utils import (
 import traceback
 import datetime
 
+# --- Config: set via ENV or defaults ---
 QUEUE_DIR = os.environ.get('QUEUE_DIR', '/queue')
 STEMS_DIR = os.environ.get('STEMS_DIR', '/stems')
-MAX_RETRIES = 3
-RETRY_DELAY = 10  # seconds
-CHUNK_LENGTH_MS = 30000  # 60 seconds
+MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
+RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 10))  # seconds
+CHUNK_LENGTH_MS = int(os.environ.get("CHUNK_LENGTH_MS", 30000))  # ms
+
+logging.basicConfig(level=logging.INFO)
 
 def process_file(file_path, song_name):
+    """Split an MP3 into stems in chunks, merge results, write output."""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             audio = AudioSegment.from_file(file_path)
             chunks = make_chunks(audio, CHUNK_LENGTH_MS)
             vocals = AudioSegment.empty()
             accompaniment = AudioSegment.empty()
-
             with tempfile.TemporaryDirectory() as temp_dir:
                 for idx, chunk in enumerate(chunks):
                     chunk_path = os.path.join(temp_dir, f"chunk_{idx}.mp3")
@@ -51,18 +54,15 @@ def process_file(file_path, song_name):
                     )
                     if result.returncode != 0:
                         raise RuntimeError(f"Spleeter error (chunk {idx}): {result.stderr}")
-
                     stem_dir = os.path.join(output_dir, f"chunk_{idx}")
                     vocals_path = os.path.join(stem_dir, "vocals.wav")
                     acc_path = os.path.join(stem_dir, "accompaniment.wav")
                     if not (os.path.exists(vocals_path) and os.path.exists(acc_path)):
                         raise FileNotFoundError(f"Missing stems for chunk {idx}: {vocals_path}, {acc_path}")
-
                     vocals_chunk = AudioSegment.from_wav(vocals_path)
                     accompaniment_chunk = AudioSegment.from_wav(acc_path)
                     vocals += vocals_chunk
                     accompaniment += accompaniment_chunk
-
                 out_dir = os.path.join(STEMS_DIR, song_name)
                 os.makedirs(out_dir, exist_ok=True)
                 vocals.export(os.path.join(out_dir, "vocals.wav"), format="wav")

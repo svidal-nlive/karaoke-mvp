@@ -1,4 +1,16 @@
+"""
+Pipeline utility functions shared across all karaoke-mvp services.
+
+- Status and error tracking (via Redis)
+- Retry logic per stage
+- Notification helpers (Telegram, Slack, Email)
+- String sanitation for filenames
+- Health endpoint
+"""
+
 import os
+import logging
+logging.basicConfig(level=logging.INFO)
 import redis
 import requests
 import smtplib
@@ -39,7 +51,8 @@ def set_file_status(filename, status, error=None, extra=None):
         value["error"] = error
     if extra:
         value.update(extra)
-    redis_client.hmset(key, value)
+    # Use hset with mapping (hmset is deprecated in redis-py >= 3.5)
+    redis_client.hset(key, mapping=value)
 
 def get_files_by_status(status):
     """List all files in Redis with the given status."""

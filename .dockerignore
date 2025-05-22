@@ -1,0 +1,47 @@
+# Ignore OS/filesystem and editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+*.tmp
+*.log
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore Git and build tools
+.git/
+.gitignore
+
+# Ignore Docker build artifacts
+*.tar
+*.tar.gz
+
+# Ignore data, persistent, or runtime folders
+input/
+queue/
+metadata_json/
+stems/
+output/
+organized/
+splitter_tmp/
+models/
+cleanup-logs/
+jellyfin/
+doublecommander_config/
+deemix_config/
+grafana_data/
+prometheus_data/
+# Any extra local state dirs for Grafana, Prometheus, Jellyfin, etc.
+
+# VSCode and other IDE/project configs
+.vscode/
+.idea/
+*.code-workspace
+
+# Ignore .env files (unless you want them copied)
+.env
+.env.*

@@ -1,17 +1,19 @@
 import os
 import argparse
 import shutil
+import logging
 from shared.pipeline_utils import redis_client, clean_string
 
+# Logging for troubleshooting
+logging.basicConfig(level=logging.INFO)
+
 # --- Config ---
-# Map stage names to subdirectories for cleanup
 PIPELINE_CLEAN_TARGETS = {
     "metadata": "/metadata/json",
     "queue": "/queue",
     "stems": "/stems",
     "output": "/output",
 }
-# Suffix patterns for relevant files (to match pipeline conventions)
 SUFFIX_MAP = {
     "metadata": [".mp3.json", "_cover.jpg"],
     "queue": [".mp3"],
@@ -20,7 +22,9 @@ SUFFIX_MAP = {
 }
 
 def list_cleanable_files():
-    """Return a list of (stage, path_to_delete) for completed files no longer in active Redis states."""
+    """
+    Return a list of (stage, path_to_delete) for completed files no longer in active Redis states.
+    """
     clean_targets = []
     # Get all organized files from redis (finished files)
     organized_files = redis_client.keys("file:*")

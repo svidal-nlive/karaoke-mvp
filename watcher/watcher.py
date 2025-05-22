@@ -10,11 +10,15 @@ from shared.pipeline_utils import set_file_status, get_files_by_status, set_file
 import traceback
 import datetime
 
+# --- Configuration ---
 INPUT_DIR = os.environ.get("INPUT_DIR", "/input")
 QUEUE_DIR = os.environ.get("QUEUE_DIR", "/queue")
 LOGS_DIR = os.environ.get("LOGS_DIR", "/logs")
+STABILITY_CHECKS = int(os.environ.get("FILE_STABILITY_CHECKS", 4))  # Number of consecutive stable checks before moving
 
 class MP3Handler(FileSystemEventHandler):
+    """Watches for new .mp3 files and queues them for processing if stable."""
+
     def on_created(self, event):
         if event.is_directory or not event.src_path.endswith('.mp3'):
             return
@@ -39,7 +43,7 @@ class MP3Handler(FileSystemEventHandler):
                     stable_count += 1
                 else:
                     stable_count = 0
-                if stable_count >= 4:
+                if stable_count >= STABILITY_CHECKS:
                     break
             dest = os.path.join(QUEUE_DIR, fname)
             shutil.copy2(event.src_path, dest)
@@ -53,11 +57,13 @@ class MP3Handler(FileSystemEventHandler):
             notify_all("Karaoke Pipeline Error", f"Error in watcher for {fname} at {timestamp}:\n{e}")
 
 def run_watcher():
+    """Main loop: start watchdog observer on INPUT_DIR for new mp3 files."""
     os.makedirs(QUEUE_DIR, exist_ok=True)
     event_handler = MP3Handler()
     observer = Observer()
     observer.schedule(event_handler, INPUT_DIR, recursive=True)
     observer.start()
+    logging.info("Watcher started.")
     try:
         while True:
             time.sleep(1)
@@ -69,9 +75,11 @@ app = Flask(__name__)
 
 @app.route("/health")
 def health():
+    """Healthcheck endpoint for Docker/Compose health probe."""
     return "ok", 200
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     t = threading.Thread(target=run_watcher, daemon=True)
     t.start()
     app.run(host="0.0.0.0", port=5000)

@@ -1,6 +1,5 @@
-watchdog
-flask==2.2.5
-werkzeug==2.2.3
-redis
-requests
-
+watchdog==6.0.0
+Flask==2.2.5
+Werkzeug==2.2.3
+redis==6.1.0
+requests==2.32.3

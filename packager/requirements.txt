@@ -1,7 +1,7 @@
-mutagen
-pydub
-ffmpeg-python
-flask==2.2.5
-werkzeug==2.2.3
-requests
-redis
+# ffmpeg-python==0.2.0
+mutagen==1.47.0
+pydub==0.25.1
+Flask==2.2.5
+Werkzeug==2.2.3
+requests==2.32.3
+redis==6.1.0

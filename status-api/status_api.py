@@ -1,4 +1,5 @@
 import os
+import logging
 from flask import Flask, jsonify, request, Response
 import time
 from shared.pipeline_utils import (
@@ -7,6 +8,9 @@ from shared.pipeline_utils import (
     set_file_status,
     clean_string
 )
+
+# --- Logging for troubleshooting ---
+logging.basicConfig(level=logging.INFO)
 
 PIPELINE_STAGES = [
     ("input", "input", ".mp3"),
@@ -21,6 +25,7 @@ PIPELINE_STAGES = [
 DIRS = {k: os.environ.get(k.upper() + "_DIR", f"/{v}") for k, v, _ in PIPELINE_STAGES}
 
 def list_files(directory, suffix):
+    """List files in directory with optional suffix filtering."""
     if not os.path.exists(directory):
         return []
     if suffix:
@@ -29,6 +34,7 @@ def list_files(directory, suffix):
         return os.listdir(directory)
 
 def get_file_status(filename):
+    """Return status and last error for the given file from Redis and file system."""
     stages = {}
     namebase = os.path.splitext(filename)[0]
     for stage, dkey, suffix in PIPELINE_STAGES:
@@ -50,6 +56,7 @@ app = Flask(__name__)
 
 @app.route("/health")
 def health():
+    """Healthcheck endpoint."""
     return "ok", 200
 
 @app.route("/status")
