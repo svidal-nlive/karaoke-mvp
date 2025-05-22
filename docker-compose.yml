@@ -67,7 +67,6 @@ services:
     volumes:
       - input:/input
       - queue:/queue
-      - shared_utils:/app/shared:ro
     environment:
       - REDIS_HOST=redis
     healthcheck:
@@ -86,7 +85,6 @@ services:
     volumes:
       - queue:/queue
       - metadata_json:/metadata/json
-      - shared_utils:/app/shared:ro
     environment:
       - REDIS_HOST=redis
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -109,7 +107,6 @@ services:
       - queue:/queue
       - stems:/stems
       - splitter_tmp:/tmp
-      - shared_utils:/app/shared:ro
       - ./models:/app/pretrained_models
     environment:
       - REDIS_HOST=redis
@@ -133,7 +130,6 @@ services:
       - stems:/stems
       - metadata_json:/metadata/json
       - output:/output
-      - shared_utils:/app/shared:ro
     environment:
       - REDIS_HOST=redis
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -156,7 +152,6 @@ services:
       - output:/output
       - organized:/organized
       - metadata_json:/metadata/json
-      - shared_utils:/app/shared:ro
     environment:
       - REDIS_HOST=redis
       - OUTPUT_DIR=/output
@@ -191,7 +186,6 @@ services:
       - stems:/stems
       - output:/output
       - organized:/organized
-      - shared_utils:/app/shared:ro
     environment:
       - REDIS_HOST=redis
     healthcheck:
@@ -210,7 +204,6 @@ services:
       - output:/output
       - queue:/queue
       - organized:/organized
-      - shared_utils:/app/shared:ro
     environment:
       - REDIS_HOST=redis
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -223,7 +216,6 @@ services:
     depends_on:
       - redis
     volumes:
-      - shared_utils:/app/shared:ro
     environment:
       - REDIS_HOST=redis
       # (Add any required ENV for notifications)
