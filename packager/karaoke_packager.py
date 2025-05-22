@@ -2,7 +2,6 @@ import os
 import json
 import logging
 import time
-import threading
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC
 from pydub import AudioSegment

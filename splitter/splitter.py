@@ -2,7 +2,6 @@ import os
 import time
 import logging
 import tempfile
-import shutil
 import subprocess
 from pydub import AudioSegment
 from pydub.utils import make_chunks

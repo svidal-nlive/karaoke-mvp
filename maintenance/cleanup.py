@@ -2,7 +2,7 @@ import os
 import argparse
 import shutil
 import logging
-from shared.pipeline_utils import redis_client, clean_string
+from shared.pipeline_utils import redis_client
 
 # Logging for troubleshooting
 logging.basicConfig(level=logging.INFO)

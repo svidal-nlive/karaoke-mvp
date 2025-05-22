@@ -6,7 +6,6 @@ from shared.pipeline_utils import (
     redis_client,
     get_files_by_status,
     set_file_status,
-    clean_string,
 )
 
 # --- Logging for troubleshooting ---
