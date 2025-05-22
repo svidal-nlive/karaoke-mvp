@@ -79,7 +79,7 @@ Edit
 
 ### Building & Publishing Images (for Maintainers)
 
-    ```bash
+    ```sh
     ./build_and_push_all.sh
     Update DOCKERHUB_USER in the script.
     ```
