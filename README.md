@@ -82,9 +82,8 @@ Edit
     ```bash
     ./build_and_push_all.sh
     Update DOCKERHUB_USER in the script.
+    # Make sure to push after any code changes to core pipeline services.
     ```
-    
-    **Make sure to push after any code changes to core pipeline services.**
 
 ---
 
