@@ -35,18 +35,18 @@ Karaoke-MVP is a modular, containerized, multi-stage audio processing pipeline t
 
 ## Folder Structure
 
-karaoke-mvp/  
-├── watcher/ # Monitors input for new audio  
-├── metadata/ # Extracts and writes metadata JSON  
-├── splitter/ # Spleeter-powered stem separation  
-├── packager/ # Tags instrumentals as MP3  
-├── organizer/ # Moves finalized files to organized structure  
-├── maintenance/ # Cleanup scripts/services  
-├── status-api/ # Flask API for status/health  
-├── telegram-bot/ # Telegram user control and integration  
-├── shared/ # Shared utils (e.g., pipeline_utils.py)  
-├── docker-compose.yml  
-├── requirements.txt # Per service  
+karaoke-mvp/
+├── watcher/ # Monitors input for new audio
+├── metadata/ # Extracts and writes metadata JSON
+├── splitter/ # Spleeter-powered stem separation
+├── packager/ # Tags instrumentals as MP3
+├── organizer/ # Moves finalized files to organized structure
+├── maintenance/ # Cleanup scripts/services
+├── status-api/ # Flask API for status/health
+├── telegram-bot/ # Telegram user control and integration
+├── shared/ # Shared utils (e.g., pipeline_utils.py)
+├── docker-compose.yml
+├── requirements.txt # Per service
 └── README.md
 
 
@@ -79,11 +79,12 @@ Edit
 
 ### Building & Publishing Images (for Maintainers)
 
-```bash
-./build_and_push_all.sh
-Update DOCKERHUB_USER in the script.
-
-Make sure to push after any code changes to core pipeline services.
+    ```bash
+    ./build_and_push_all.sh
+    Update DOCKERHUB_USER in the script.
+    ```
+    
+    **Make sure to push after any code changes to core pipeline services.**
 
 ---
 
@@ -227,11 +228,11 @@ If running on a NAS or low-powered device, **use DockerHub images** for fastest 
 
 ## Troubleshooting
 
-- **Splitter fails with “Killed”:**  
+- **Splitter fails with “Killed”:**
   Increase container RAM or reduce chunk length (see splitter config).
-- **Telegram bot doesn’t respond:**  
+- **Telegram bot doesn’t respond:**
   Double-check your bot token and chat ID in `.env`.
-- **Permissions errors on NAS:**  
+- **Permissions errors on NAS:**
   Ensure correct user/group mapping for Docker volumes.
 
 ---
@@ -241,4 +242,3 @@ If running on a NAS or low-powered device, **use DockerHub images** for fastest 
 For support, open a GitHub issue or reach out via Telegram!
 
 ---
-
