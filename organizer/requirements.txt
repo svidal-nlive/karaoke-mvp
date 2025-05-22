@@ -1,0 +1,6 @@
+mutagen
+pydub
+flask==2.2.5
+werkzeug==2.2.3
+requests
+redis

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+.env
+.env.*
+!*.env.example
+
+# Docker
+*.log
+*.tmp
+docker-compose.override.yml
+cleanup-logs/
+models/2stems/*
+!models/2stems/.gitkeep
+
+# VSCode/Editor
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# System
+.DS_Store
+Thumbs.db
+*.bak
+*~
+
+# Jellyfin data (optional)
+jellyfin/library
+grafana_data

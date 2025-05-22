@@ -1,0 +1,1 @@
+0 2 * * * cd /app && python cleanup.py --live >> /var/log/cleanup.log 2>&1

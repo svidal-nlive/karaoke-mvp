@@ -1,0 +1,11 @@
+groups:
+- name: karaoke-pipeline-alerts
+  rules:
+    - alert: KaraokePipelineErrorDetected
+      expr: karaoke_files_error > 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Karaoke pipeline has errors"
+        description: "There are {{ $value }} files in error state! Investigate via /error-files or /error-details."
