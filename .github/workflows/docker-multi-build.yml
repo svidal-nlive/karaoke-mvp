@@ -1,8 +1,9 @@
 # .github/workflows/docker-multi-build.yml
-# CI/CD for Karaoke-MVP: Build, lint, and push all Docker microservices (multi-arch) to DockerHub & GHCR
+# CI/CD for Karaoke-MVP: Build and push all Docker microservices (multi-arch) to DockerHub & GHCR
 # - Lints Python code before build
-# - Builds each service using project root context (so shared/ is always available)
+# - Builds each service using its context (no cross-service copy)
 # - Pushes images to DockerHub and GitHub Container Registry
+# - Sends Telegram notifications on success/failure
 # - Runs nightly scheduled builds for freshness
 
 name: Build and Push Docker Images
@@ -11,7 +12,7 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-  workflow_dispatch:
+  workflow_dispatch:       # Manual trigger from GitHub UI
   schedule:
     - cron: '0 3 * * *'   # Nightly build at 3AM UTC
 
@@ -48,10 +49,10 @@ jobs:
         run: |
           pip install -r ${{ matrix.service }}/requirements.txt
           pip install flake8 pytest
+
       - name: Lint with flake8
         run: flake8 ${{ matrix.service }}/
 
-      # Optional: Add pytest for real tests
       # - name: Run tests
       #   run: pytest ${{ matrix.service }}/
 
@@ -81,8 +82,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Optional: Enable build cache for faster CI
-      # - name: Cache Docker layers
+      # - name: Cache Docker layers (optional)
       #   uses: actions/cache@v4
       #   with:
       #     path: /tmp/.buildx-cache
@@ -116,7 +116,7 @@ jobs:
       - name: Build and push ${{ matrix.service }} to DockerHub & GHCR
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./${{ matrix.service }}
           file: ./${{ matrix.service }}/Dockerfile
           push: true
           tags: |
@@ -125,19 +125,16 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:latest
           platforms: linux/amd64,linux/arm64
-          # cache-from: type=local,src=/tmp/.buildx-cache
-          # cache-to: type=local,dest=/tmp/.buildx-cache
 
-      - name: Health check built image (only for HTTP APIs)
+      # Health check for services exposing HTTP APIs on port 5000
+      - name: Health check (port 5000)
         if: |
-          matrix.service == 'status-api' ||
           matrix.service == 'metadata' ||
           matrix.service == 'watcher' ||
           matrix.service == 'organizer'
         run: |
           IMAGE=ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
           docker run -d --rm -p 5000:5000 --name temp_test $IMAGE
-          # Wait for port to open (10 x 1s tries)
           for i in {1..10}; do
             if curl -s http://localhost:5000/health; then
               echo "Healthcheck passed."
@@ -152,7 +149,8 @@ jobs:
           docker rm -f temp_test >/dev/null 2>&1 || true
           exit 1
 
-      - name: Health check built image (status-api uses port 5001)
+      # Health check for status-api (port 5001)
+      - name: Health check (status-api on port 5001)
         if: matrix.service == 'status-api'
         run: |
           IMAGE=ghcr.io/${{ github.repository_owner }}/karaoke-status-api:${{ env.IMAGE_TAG }}
@@ -171,17 +169,17 @@ jobs:
           docker rm -f temp_test_status >/dev/null 2>&1 || true
           exit 1
 
-      # Telegram notifications (optional: set your secrets in repo settings)
+      # Telegram notifications (set your secrets in repo settings)
       - name: Notify Success (Telegram Example)
         if: ${{ success() }}
         run: |
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d text="✅ Docker image ${{ matrix.service }} built and pushed as ${{ env.IMAGE_TAG }}"
+
       - name: Notify Failure (Telegram Example)
         if: ${{ failure() }}
         run: |
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d text="❌ Build or push failed for ${{ matrix.service }}"
-
