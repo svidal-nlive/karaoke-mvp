@@ -1,10 +1,5 @@
 # .github/workflows/docker-multi-build.yml
-# CI/CD for Karaoke-MVP: Build and push all Docker microservices (multi-arch) to DockerHub & GHCR
-# - Lints Python code before build (optional, but recommended)
-# - Builds each service using its context (no cross-service copy)
-# - Pushes images to DockerHub and GitHub Container Registry
-# - Sends optional Telegram notifications
-# - Runs nightly scheduled builds for freshness
+# CI/CD for Karaoke-MVP: Build, Lint, Test, Push (multi-arch) for all microservices
 
 name: Build and Push Docker Images
 
@@ -12,17 +7,14 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-  workflow_dispatch:       # Manual trigger from GitHub UI
+  workflow_dispatch:
   schedule:
-    - cron: '0 3 * * *'   # Nightly build at 3AM UTC
+    - cron: '0 3 * * *'   # Nightly at 3AM UTC
 
 env:
-  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}  # Use repository secrets for sensitive information
+  DOCKERHUB_USER: nlivestudent  # Change if needed
 
 jobs:
-  # -------------
-  # Lint and Test
-  # -------------
   lint-and-test:
     name: Lint & Test Python
     runs-on: ubuntu-latest
@@ -53,15 +45,9 @@ jobs:
       - name: Lint with flake8
         run: flake8 ${{ matrix.service }}/
 
-      # Uncomment this block if you add tests (pytest) to your services!
-      # Currently, this block is commented out because tests are not implemented.
-      # Enable this block once you have added tests to your services.
       # - name: Run tests
       #   run: pytest ${{ matrix.service }}/
 
-  # -------------------------------
-  # Build and Push Docker Images
-  # -------------------------------
   build-and-push:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
@@ -83,16 +69,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-      # Optional: Enable build cache for faster CI. Enabling the cache speeds up builds by reusing layers but may increase storage usage. Comment out this section to disable caching.
-
-      # Optional: Enable build cache for faster CI # Comment for no build cache
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ matrix.service }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-${{ matrix.service }}-
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to DockerHub
         uses: docker/login-action@v3
@@ -120,7 +97,7 @@ jobs:
       - name: Build and push ${{ matrix.service }} to DockerHub & GHCR
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./${{ matrix.service }}
           file: ./${{ matrix.service }}/Dockerfile
           push: true
           tags: |
@@ -129,9 +106,6 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:latest
           platforms: linux/amd64,linux/arm64
-          # Uncomment to disable build cache
-          cache-from: type=local,src=/tmp/.buildx-cache   
-          cache-to: type=local,dest=/tmp/.buildx-cache
 
       - name: Health check built image
         run: |
@@ -170,17 +144,17 @@ jobs:
             exit 1
           fi
 
-      # Telegram notifications (set your secrets in repo settings)
-      - name: Notify Success (Telegram Example)
+      - name: Notify Success (Telegram)
         if: ${{ success() }}
         run: |
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d text="✅ Docker image ${{ matrix.service }} built and pushed as ${{ env.IMAGE_TAG }}"
 
-      - name: Notify Failure (Telegram Example)
+      - name: Notify Failure (Telegram)
         if: ${{ failure() }}
         run: |
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="❌ Build or push failed for ${{ matrix.service }}"
+            -d text="❌ Build or push failed for ${{ matrix.service }} (tag: ${{ env.IMAGE_TAG }})"
+
