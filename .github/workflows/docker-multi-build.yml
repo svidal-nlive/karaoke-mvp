@@ -116,7 +116,7 @@ jobs:
       - name: Build and push ${{ matrix.service }} to DockerHub & GHCR
         uses: docker/build-push-action@v5
         with:
-          context: ./${{ matrix.service }}
+          context: .                            # <--- build context is project root
           file: ./${{ matrix.service }}/Dockerfile
           push: true
           tags: |
@@ -125,6 +125,9 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:latest
           platforms: linux/amd64,linux/arm64
+          # Uncomment for build cache if desired:
+          # cache-from: type=local,src=/tmp/.buildx-cache
+          # cache-to: type=local,dest=/tmp/.buildx-cache
 
       # Health check for services exposing HTTP APIs on port 5000
       - name: Health check (port 5000)
