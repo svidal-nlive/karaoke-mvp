@@ -83,14 +83,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Optional: Enable build cache for faster CI
-      # - name: Cache Docker layers
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: /tmp/.buildx-cache
-      #     key: ${{ runner.os }}-buildx-${{ matrix.service }}-${{ github.sha }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-buildx-${{ matrix.service }}-
+      # Comment for no build cache
+      Optional: Enable build cache for faster CI
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ matrix.service }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ matrix.service }}-
 
       - name: Log in to DockerHub
         uses: docker/login-action@v3
@@ -127,21 +128,45 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:latest
           platforms: linux/amd64,linux/arm64
-          # cache-from: type=local,src=/tmp/.buildx-cache   # Uncomment for build cache
-          # cache-to: type=local,dest=/tmp/.buildx-cache
+          # Comment for nobuild cache
+          cache-from: type=local,src=/tmp/.buildx-cache   
+          cache-to: type=local,dest=/tmp/.buildx-cache
 
       - name: Health check built image
         run: |
           docker pull ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
+
+          # Set port based on service
+          if [[ "${{ matrix.service }}" == "status-api" ]]; then
+            PORT=5001
+          else
+            PORT=5000
+          fi
+
           # Only run health check for services exposing HTTP APIs
           if [[ "${{ matrix.service }}" == "status-api" || \
                 "${{ matrix.service }}" == "metadata" || \
                 "${{ matrix.service }}" == "watcher" || \
                 "${{ matrix.service }}" == "organizer" ]]; then
-            docker run -d --name temp_test -p 5000:5000 ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
-            sleep 10
-            curl -f http://localhost:5000/health || (docker logs temp_test && exit 1)
+
+            docker run -d --name temp_test -p $PORT:$PORT ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
+
+            # Wait for container to be up and respond to healthcheck
+            for i in {1..10}; do
+              if docker exec temp_test curl -sf http://localhost:$PORT/health; then
+                echo "Health check succeeded."
+                docker rm -f temp_test
+                exit 0
+              else
+                echo "Waiting for service on port $PORT... ($i/10)"
+                sleep 3
+              fi
+            done
+
+            echo "Health check failed after waiting. Dumping logs:"
+            docker logs temp_test
             docker rm -f temp_test
+            exit 1
           fi
 
       # Telegram notifications (set your secrets in repo settings)
