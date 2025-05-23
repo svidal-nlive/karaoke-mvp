@@ -17,7 +17,7 @@ on:
     - cron: '0 3 * * *'   # Nightly build at 3AM UTC
 
 env:
-  DOCKERHUB_USER: nlivestudent  # Set your DockerHub username here (or in repository secrets)
+  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}  # Use repository secrets for sensitive information
 
 jobs:
   # -------------
@@ -54,6 +54,8 @@ jobs:
         run: flake8 ${{ matrix.service }}/
 
       # Uncomment this block if you add tests (pytest) to your services!
+      # Currently, this block is commented out because tests are not implemented.
+      # Enable this block once you have added tests to your services.
       # - name: Run tests
       #   run: pytest ${{ matrix.service }}/
 
@@ -81,10 +83,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # Optional: Enable build cache for faster CI. Enabling the cache speeds up builds by reusing layers but may increase storage usage. Comment out this section to disable caching.
 
-      # Comment for no build cache
-      Optional: Enable build cache for faster CI
+      # Optional: Enable build cache for faster CI # Comment for no build cache
       - name: Cache Docker layers
         uses: actions/cache@v4
         with:
@@ -128,7 +129,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:latest
           platforms: linux/amd64,linux/arm64
-          # Comment for nobuild cache
+          # Uncomment to disable build cache
           cache-from: type=local,src=/tmp/.buildx-cache   
           cache-to: type=local,dest=/tmp/.buildx-cache
 
