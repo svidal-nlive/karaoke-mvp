@@ -1,9 +1,5 @@
 version: "3.8"
 
-# Global environment file, loaded by Compose and all services
-env_file:
-  - .env
-
 services:
   # --- Permissions init jobs (run-once, do not restart) ---
   fix-input-permissions:

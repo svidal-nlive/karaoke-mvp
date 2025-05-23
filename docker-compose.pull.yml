@@ -168,7 +168,7 @@ services:
     restart: unless-stopped
 
   telegram_youtube_bot:
-    image: ghcr.io/svidal-nlive/karaoke-telegram-youtube-bot:latest
+    image: ghcr.io/svidal-nlive/karaoke-telegram_youtube_bot:latest
     container_name: telegram_youtube_bot
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -189,7 +189,8 @@ services:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     command: tunnel run
-    environment: [TUNNEL_TOKEN=${TUNNEL_TOKEN}]
+    environment: 
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
 
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
