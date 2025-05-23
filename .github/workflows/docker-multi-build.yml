@@ -16,7 +16,7 @@ on:
     - cron: '0 3 * * *'   # Nightly build at 3AM UTC
 
 env:
-  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}  # Set your DockerHub username here (or in repository secrets)
+  DOCKERHUB_USER: nlivestudent  # Set your DockerHub username here (or in repository secrets)
 
 jobs:
   # -------------
