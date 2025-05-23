@@ -1,0 +1,105 @@
+services:
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    # Uncomment if you want it to join a named network, see 'networks:' section
+
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/New_York}
+      # Optional: change to your host’s IP or desired public URL
+      - JELLYFIN_PublishedServerUrl=http://127.0.0.1
+    volumes:
+      - ./jellyfin/library:/config
+      - organized:/organized
+    ports:
+      - 8096:8096
+      - 8920:8920
+      - 7359:7359/udp
+      - 1900:1900/udp
+    restart: unless-stopped
+
+  deemix:
+    image: registry.gitlab.com/bockiii/deemix-docker
+    container_name: deemix
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - UMASK_SET=022
+    volumes:
+      - input:/downloads
+      - ./deemix_config:/config
+    ports:
+      - 6595:6595
+    restart: unless-stopped
+
+  doublecommander:
+    image: lscr.io/linuxserver/doublecommander:latest
+    container_name: doublecommander
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+    volumes:
+      - input:/karaoke-mvp/input
+      - output:/karaoke-mvp/output
+      - stems:/karaoke-mvp/stems
+      - queue:/karaoke-mvp/queue
+      - metadata_json:/karaoke-mvp/metadata/json
+      - organized:/karaoke-mvp/organized
+      - ./models:/karaoke-mvp/models
+      - splitter_tmp:/karaoke-mvp/splitter-tmp
+      - ./doublecommander_config:/config
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./grafana_data:/var/lib/grafana
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./telegram.tmpl:/etc/alertmanager/telegram.tmpl:ro
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+
+# Volumes are declared here for compose reference but are owned/created by the main stack.
+volumes:
+  input:
+  queue:
+  metadata_json:
+  stems:
+  output:
+  organized:
+  splitter_tmp:
+
+networks:
+  default:
+    name: karaoke-mvp_default

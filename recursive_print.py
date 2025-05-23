@@ -1,8 +1,9 @@
 import os
 import argparse
+import fnmatch
 
 # --- Configuration ---
-INCLUDE_TYPES = ['Dockerfile'] #, '.py', '.txt', '.log', '.yml', '.env', '.gitignore', '.dockerignore']
+DEFAULT_INCLUDE_TYPES = ['Dockerfile', '*.py', '*.txt', '*.log', '*.yml', '*.env', '.gitignore', '.dockerignore']
 EXCLUDE_DIRS_CONTENT = ['node_modules', 'build', '.git', 'deemix_config', 'doublecommander_config', 'grafana_data', 'jellyfin']
 EXCLUDE_DIRS_TREE = ['node_modules', 'build', '.git', 'deemix_config', 'doublecommander_config', 'grafana_data', 'jellyfin']
 # ---------------------
@@ -29,8 +30,12 @@ def print_tree(root, prefix=""):
             extension = '    ' if index == len(entries) - 1 else '│   '
             print_tree(path, prefix + extension)
 
-def print_contents(root):
-    """Find and print contents of files matching INCLUDE_TYPES, skipping EXCLUDE_DIRS_CONTENT and handling PermissionError."""
+def file_matches(filename, include_types):
+    """Return True if filename matches any pattern in include_types."""
+    return any(fnmatch.fnmatch(filename, pattern) for pattern in include_types)
+
+def print_contents(root, include_types, dry_run=False):
+    """Find and print contents of files matching include_types, with options."""
     for dirpath, dirnames, filenames in os.walk(root, topdown=True, onerror=lambda e: print(f"[Permission Denied]: {e.filename}")):
         # Skip excluded directories
         rel_dir = os.path.relpath(dirpath, start=BASE_DIR)
@@ -40,17 +45,19 @@ def print_contents(root):
             continue
 
         for filename in filenames:
-            file_ext = os.path.splitext(filename)[1]
-            if (file_ext in INCLUDE_TYPES) or (filename in INCLUDE_TYPES):
+            if file_matches(filename, include_types):
                 rel_path = os.path.relpath(os.path.join(dirpath, filename), start=BASE_DIR)
-                print(f"\n=== {rel_path} ===")
-                try:
-                    with open(os.path.join(dirpath, filename), 'r', encoding='utf-8') as f:
-                        print(f.read())
-                except PermissionError:
-                    print(f"[Permission Denied]: {rel_path}")
-                except Exception as e:
-                    print(f"Error reading {rel_path}: {e}")
+                if dry_run:
+                    print(rel_path)
+                else:
+                    print(f"\n=== {rel_path} ===")
+                    try:
+                        with open(os.path.join(dirpath, filename), 'r', encoding='utf-8') as f:
+                            print(f.read())
+                    except PermissionError:
+                        print(f"[Permission Denied]: {rel_path}")
+                    except Exception as e:
+                        print(f"Error reading {rel_path}: {e}")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -60,14 +67,24 @@ def main():
         'target', nargs='?', default='.',
         help='Target directory to scan (default: current directory)'
     )
+    parser.add_argument(
+        '--file', '-f', action='append', default=None,
+        help='File pattern(s) to match (wildcards OK). Can be used multiple times. E.g. --file "*.yml" --file "Dockerfile"'
+    )
+    parser.add_argument(
+        '--dry-run', action='store_true',
+        help='Only print the matched filenames, not their contents'
+    )
     args = parser.parse_args()
 
     global BASE_DIR
     BASE_DIR = os.path.abspath(args.target)
+    include_types = args.file if args.file else DEFAULT_INCLUDE_TYPES
 
-    print(BASE_DIR)
+    print(f"Base Directory: {BASE_DIR}")
     print_tree(BASE_DIR)
-    print_contents(BASE_DIR)
+    print("\n" + ("DRY RUN: Filenames only" if args.dry_run else "Printing file contents") + "\n")
+    print_contents(BASE_DIR, include_types, dry_run=args.dry_run)
 
 if __name__ == '__main__':
     main()

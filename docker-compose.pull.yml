@@ -8,8 +8,6 @@ services:
     image: ghcr.io/svidal-nlive/karaoke-watcher:latest
     container_name: karaoke_watcher
     depends_on:
-      - fix-input-permissions
-      - fix-queue-permissions
       - redis
     volumes:
       - input:/input
@@ -25,8 +23,6 @@ services:
     image: ghcr.io/svidal-nlive/karaoke-metadata:latest
     container_name: karaoke_metadata
     depends_on:
-      - fix-queue-permissions
-      - fix-metadata-json-permissions
       - watcher
       - redis
     volumes:
@@ -45,9 +41,6 @@ services:
     image: ghcr.io/svidal-nlive/karaoke-splitter:latest
     container_name: karaoke_splitter
     depends_on:
-      - fix-queue-permissions
-      - fix-stems-permissions
-      - fix-splitter-tmp-permissions
       - metadata
       - redis
     volumes:
@@ -68,9 +61,6 @@ services:
     image: ghcr.io/svidal-nlive/karaoke-packager:latest
     container_name: karaoke_packager
     depends_on:
-      - fix-stems-permissions
-      - fix-metadata-json-permissions
-      - fix-output-permissions
       - splitter
       - redis
     volumes:
@@ -90,9 +80,6 @@ services:
     image: ghcr.io/svidal-nlive/karaoke-organizer:latest
     container_name: karaoke_organizer
     depends_on:
-      - fix-output-permissions
-      - fix-organized-permissions
-      - fix-metadata-json-permissions
       - packager
       - redis
     volumes:
@@ -104,7 +91,7 @@ services:
       - OUTPUT_DIR=/output
       - ORG_DIR=/organized
       - LOGS_DIR=/logs
-      - META_DIR=/metadata/json
+      - META_DIR=/metadata
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     healthcheck:
@@ -116,12 +103,6 @@ services:
     image: ghcr.io/svidal-nlive/karaoke-status-api:latest
     container_name: karaoke_status_api
     depends_on:
-      - fix-input-permissions
-      - fix-queue-permissions
-      - fix-metadata-json-permissions
-      - fix-stems-permissions
-      - fix-output-permissions
-      - fix-organized-permissions
       - organizer
       - redis
     ports:
@@ -162,10 +143,18 @@ services:
     container_name: karaoke_maintenance_cron
     depends_on:
       - redis
+    volumes:
+      - metadata_json:/metadata/json
+      - stems:/stems
+      - output:/output
+      - queue:/queue
+      - organized:/organized
     environment:
       - REDIS_HOST=redis
-      # (Add any required ENV for notifications)
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     restart: unless-stopped
+    command: ["sh", "-c", "crontab /app/crontab && cron -f"]
 
   telegram_youtube_bot:
     image: ghcr.io/svidal-nlive/karaoke-telegram_youtube_bot:latest
@@ -174,110 +163,23 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - YTDLP_OUTPUT_DIR=/input
-      - METADATA_OUTPUT_DIR=/metadata/json
+      - METADATA_OUTPUT_DIR=/metadata
     volumes:
       - input:/input
       - metadata_json:/metadata/json
     depends_on:
-      - fix-input-permissions
-      - fix-metadata-json-permissions
-    restart: unless-stopped
-
-  # --- Support/UI containers use official images ---
-  tunnel:
-    container_name: tunnel
-    image: cloudflare/cloudflared:latest
-    restart: unless-stopped
-    command: tunnel run
-    environment: 
-      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
-
-  jellyfin:
-    image: lscr.io/linuxserver/jellyfin:latest
-    container_name: jellyfin
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/New_York
-      - JELLYFIN_PublishedServerUrl=http://http://172.28.221.43 #optional
-    volumes:
-      - ./jellyfin/library:/config
-      - organized:/organized
-    ports:
-      - 8096:8096
-      - 8920:8920 #optional
-      - 7359:7359/udp #optional
-      - 1900:1900/udp #optional
-    restart: unless-stopped
-
-  deemix:
-    image: registry.gitlab.com/bockiii/deemix-docker
-    container_name: deemix
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - UMASK_SET=022
-    volumes:
-      - input:/downloads
-      - ./deemix_config:/config
-    ports:
-      - 6595:6595
-    restart: unless-stopped
-
-  doublecommander:
-    image: lscr.io/linuxserver/doublecommander:latest
-    container_name: doublecommander
-    environment:
-      - PUID=1000
-      - PGID=1000
-    volumes:
-      - input:/karaoke-mvp/input
-      - output:/karaoke-mvp/output
-      - stems:/karaoke-mvp/stems
-      - queue:/karaoke-mvp/queue
-      - metadata_json:/karaoke-mvp/metadata/json
-      - organized:/karaoke-mvp/organized
-      - ./models:/karaoke-mvp/models
-      - splitter_tmp:/karaoke-mvp/splitter-tmp
-      - ./doublecommander_config:/config
-    ports:
-      - 3000:3000
-    restart: unless-stopped
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./alert.rules.yml:/etc/prometheus/alert.rules.yml
-    ports:
-      - "9090:9090"
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - "3001:3000"
-    volumes:
-      - ./grafana_data:/var/lib/grafana
-    restart: unless-stopped
-
-  alertmanager:
-    image: prom/alertmanager:latest
-    container_name: alertmanager
-    volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
-      - ./telegram.tmpl:/etc/alertmanager/telegram.tmpl
-    ports:
-      - "9093:9093"
+      - redis
     restart: unless-stopped
 
 volumes:
   input:
   queue:
-  metadata_json:
   stems:
   output:
   organized:
   splitter_tmp:
+
+  metadata_json:
+networks:
+  default:
+    name: karaoke-mvp_default

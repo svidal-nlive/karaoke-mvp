@@ -1,17 +1,26 @@
-version: "3.8"
-
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: karaoke_redis
+    restart: unless-stopped
+    volumes:
+      - redis:/data
+
   watcher:
-    image: nlivestudent/karaoke-watcher:latest
+    image: ghcr.io/svidal-nlive/karaoke-watcher:latest
+    container_name: karaoke_watcher
     restart: always
     environment:
       - ENV=production
+      - REDIS_HOST=redis
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
       - input:/input
       - queue:/queue
       - logs:/logs
+    depends_on:
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -19,14 +28,22 @@ services:
       retries: 3
 
   metadata:
-    image: nlivestudent/karaoke-metadata:latest
+    image: ghcr.io/svidal-nlive/karaoke-metadata:latest
+    container_name: karaoke_metadata
     restart: always
     environment:
       - ENV=production
+      - REDIS_HOST=redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
-      - metadata:/metadata
+      - metadata_json:/metadata/json
       - shared:/shared
       - logs:/logs
+      - queue:/queue
+    depends_on:
+      - watcher
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -34,15 +51,23 @@ services:
       retries: 3
 
   splitter:
-    image: nlivestudent/karaoke-splitter:latest
+    image: ghcr.io/svidal-nlive/karaoke-splitter:latest
+    container_name: karaoke_splitter
     restart: always
     environment:
       - ENV=production
+      - REDIS_HOST=redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
       - input:/input
       - stems:/stems
       - models:/models
       - logs:/logs
+      - queue:/queue
+    depends_on:
+      - metadata
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -50,14 +75,22 @@ services:
       retries: 3
 
   packager:
-    image: nlivestudent/karaoke-packager:latest
+    image: ghcr.io/svidal-nlive/karaoke-packager:latest
+    container_name: karaoke_packager
     restart: always
     environment:
       - ENV=production
+      - REDIS_HOST=redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
       - stems:/stems
       - output:/output
       - logs:/logs
+      - metadata_json:/metadata/json
+    depends_on:
+      - splitter
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -65,37 +98,51 @@ services:
       retries: 3
 
   organizer:
-    image: nlivestudent/karaoke-organizer:latest
+    image: ghcr.io/svidal-nlive/karaoke-organizer:latest
+    container_name: karaoke_organizer
     restart: always
     environment:
       - ENV=production
+      - REDIS_HOST=redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - OUTPUT_DIR=/output
+      - ORG_DIR=/organized
+      - LOGS_DIR=/logs
+      - META_DIR=/metadata
     volumes:
       - output:/output
       - organized:/organized
       - logs:/logs
+      - metadata_json:/metadata/json
+    depends_on:
+      - packager
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
 
-  telegram_youtube_bot:
-    image: nlivestudent/karaoke-telegram-bot:latest
-    restart: always
-    environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-      - ENV=production
-    depends_on:
-      - redis
-
   status-api:
-    image: nlivestudent/karaoke-status-api:latest
+    image: ghcr.io/svidal-nlive/karaoke-status-api:latest
+    container_name: karaoke_status_api
     restart: always
     environment:
       - ENV=production
+      - REDIS_HOST=redis
     ports:
       - "5001:5001"
+    volumes:
+      - input:/input
+      - queue:/queue
+      - metadata_json:/metadata/json
+      - stems:/stems
+      - output:/output
+      - organized:/organized
+    depends_on:
+      - organizer
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
@@ -103,29 +150,53 @@ services:
       retries: 3
 
   maintenance:
-    image: nlivestudent/karaoke-maintenance:latest
+    image: ghcr.io/svidal-nlive/karaoke-maintenance:latest
+    container_name: karaoke_maintenance
     restart: unless-stopped
     environment:
       - ENV=production
+      - REDIS_HOST=redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
       - logs:/logs
       - input:/input
       - output:/output
+      - metadata_json:/metadata/json
+      - stems:/stems
+      - queue:/queue
+      - organized:/organized
+    depends_on:
+      - redis
 
-  redis:
-    image: redis:7-alpine
+  telegram_youtube_bot:
+    image: ghcr.io/svidal-nlive/karaoke-telegram_youtube_bot:latest
+    container_name: telegram_youtube_bot
     restart: always
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - ENV=production
+      - YTDLP_OUTPUT_DIR=/input
+      - METADATA_OUTPUT_DIR=/metadata
     volumes:
-      - redis:/data
+      - input:/input
+      - metadata_json:/metadata/json
+    depends_on:
+      - redis
 
 volumes:
   input:
   queue:
   logs:
-  metadata:
   shared:
   stems:
   models:
   output:
   organized:
   redis:
+
+  metadata_json:
+networks:
+  default:
+    name: karaoke-mvp_default

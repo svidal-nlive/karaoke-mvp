@@ -1,0 +1,36 @@
+services:
+  watcher:
+    environment:
+      - ENV=production
+
+  metadata:
+    environment:
+      - ENV=production
+
+  splitter:
+    environment:
+      - ENV=production
+
+  packager:
+    environment:
+      - ENV=production
+
+  organizer:
+    environment:
+      - ENV=production
+
+  telegram_youtube_bot:
+    environment:
+      - ENV=production
+
+  status-api:
+    environment:
+      - ENV=production
+
+  maintenance:
+    environment:
+      - ENV=production
+
+networks:
+  default:
+    name: karaoke-mvp_default

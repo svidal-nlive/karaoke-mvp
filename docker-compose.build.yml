@@ -4,43 +4,43 @@ services:
   # --- Init containers for volume permissions ---
   fix-input-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /input && chmod -R 775 /input"]
+    command: ["sh", "-c", "chown -R ${APP_UID:-1000}:${APP_GID:-1000} /input && chmod -R 775 /input"]
     volumes: [input:/input]
     restart: "no"
 
   fix-queue-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /queue && chmod -R 775 /queue"]
+    command: ["sh", "-c", "chown -R ${APP_UID:-1000}:${APP_GID:-1000} /queue && chmod -R 775 /queue"]
     volumes: [queue:/queue]
     restart: "no"
 
   fix-metadata-json-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /metadata/json && chmod -R 775 /metadata/json"]
+    command: ["sh", "-c", "chown -R ${APP_UID:-1000}:${APP_GID:-1000} /metadata/json && chmod -R 775 /metadata/json"]
     volumes: [metadata_json:/metadata/json]
     restart: "no"
 
   fix-stems-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /stems && chmod -R 775 /stems"]
+    command: ["sh", "-c", "chown -R ${APP_UID:-1000}:${APP_GID:-1000} /stems && chmod -R 775 /stems"]
     volumes: [stems:/stems]
     restart: "no"
 
   fix-output-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /output && chmod -R 775 /output"]
+    command: ["sh", "-c", "chown -R ${APP_UID:-1000}:${APP_GID:-1000} /output && chmod -R 775 /output"]
     volumes: [output:/output]
     restart: "no"
 
   fix-organized-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /organized && chmod -R 775 /organized"]
+    command: ["sh", "-c", "chown -R ${APP_UID:-1000}:${APP_GID:-1000} /organized && chmod -R 775 /organized"]
     volumes: [organized:/organized]
     restart: "no"
 
   fix-splitter-tmp-permissions:
     image: alpine:latest
-    command: ["sh", "-c", "chown -R 1000:1000 /tmp && chmod -R 1777 /tmp"]
+    command: ["sh", "-c", "chown -R ${APP_UID:-1000}:${APP_GID:-1000} /tmp && chmod -R 1777 /tmp"]
     volumes: [splitter_tmp:/tmp]
     restart: "no"
 
