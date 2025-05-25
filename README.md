@@ -1,302 +1,213 @@
-# 🎤 karaoke-mvp
-
-A modular, production-ready, self-hosted karaoke pipeline:  
-**Download songs, extract metadata, split stems, package instrumentals, organize files, and monitor everything.**  
-All services are isolated microservices, built for Docker Compose, with advanced networking, monitoring, and Telegram/Prometheus integration.
 
 ---
 
-## 🚀 Quick Start
+# Karaoke-MVP Microservices Pipeline
 
-### 1. **Clone the Repo**
+A full-stack, multi-container karaoke processing pipeline built with Python microservices and Docker. Designed for **local development**, **CI/CD automation**, and **easy deployment** with multi-architecture image builds, Telegram notifications, and robust code quality checks.
 
-```bash
-git clone https://github.com/yourusername/karaoke-mvp.git
-cd karaoke-mvp
-````
-
-### 2. **Configure Your Environment**
-
-Copy `.env.example` to `.env` and edit as needed (use strong secrets!).
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-- Set `STACK_PREFIX` for naming all containers/volumes.
-    
-- Set `BACKEND_NETWORK` (usually `${STACK_PREFIX}_backend`).
-    
-- Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` for notifications.
-    
-- (Optional) Set `TUNNEL_TOKEN` for Cloudflare Tunnel access.
-    
-- (Optional) Set `YT_DLP_COOKIES_FILE` and `YT_DLP_COOKIES_DIR` for YouTube cookies.
-    
-
-### 3. **Initialize Data Volumes (Set Permissions)**
-
-**_You MUST do this once after first clone or whenever resetting volumes!_**
-
-```bash
-docker compose -f docker-compose.init.yml --env-file .env up
-```
-
-This will create and `chown` all Docker named volumes for your pipeline.
+[GitHub Repo](https://github.com/svidal-nlive/karaoke-mvp)
 
 ---
 
-## 🟢 Run the Core Pipeline (Production)
+## 🚀 Features
 
-```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.prod.override.yml --env-file .env up -d
-```
-
-- All services run on an isolated internal network.
-    
-- Ports are bound to localhost only (use a reverse proxy or tunnel for outside access).
-    
-- Healthchecks and logs included for all services.
-    
-
----
-
-## 🌐 Cloudflare Tunnel (Secure Public Access)
-
-**Expose your stack securely to the Internet—no open inbound ports required!**
-
-1. **Set your `TUNNEL_TOKEN` in `.env`** (from Cloudflare dashboard).
-    
-2. **Bring up the tunnel:**
-    
-
-```bash
-docker compose -f docker-compose.tunnel.yml --env-file .env up -d
-```
-
-All your stack’s internal services are now accessible via your Cloudflare tunnel.
-
-- Make sure all other services join the same `${BACKEND_NETWORK}`.
-    
-- Tunnels are isolated from the public net—only exposed through Cloudflare.
-    
-
----
-
-## 🍪 yt-dlp Cookies Support
-
-Some YouTube downloads require authentication cookies for higher-quality or region-locked content.  
-**This stack fully supports mounting a cookies.txt file for `yt-dlp`!**
-
-**How to use:**
-
-1. Place your cookies file in a host directory (e.g., `./cookies/cookies.txt`).
-    
-2. Set these variables in `.env`:
-    
-    ```
-    YT_DLP_COOKIES_FILE=/cookies/cookies.txt
-    YT_DLP_COOKIES_DIR=./cookies
-    ```
-    
-3. When running the Telegram bot service, the cookie file will be automatically mounted and used.
-    
-
-**Example:**
-
-```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.prod.override.yml --env-file .env up -d
-```
-
-- The Telegram bot now uses your cookies file for yt-dlp requests.
-    
-
----
-
-## 🧩 Modular Overrides: dev / prod / support / tunnel
-
-- **Production**:  
-    `docker-compose.prod.yml` + `docker-compose.prod.override.yml`
-    
-- **Development**:  
-    `docker-compose.dev.yml` + `docker-compose.dev.override.yml`  
-    (_Builds from source, hot reload, local changes only_)
-    
-- **Support Services** (e.g., Prometheus, Grafana, Deemix, Jellyfin):  
-    `docker-compose.support.yml` + `docker-compose.support.override.yml`
-    
-- **Tunnel**:  
-    `docker-compose.tunnel.yml`  
-    (_Brings up Cloudflare tunnel container—other services must join the same backend network_)
-    
-
-You can combine/override as needed for your stack:
-
-```bash
-docker compose \
-  -f docker-compose.prod.yml \
-  -f docker-compose.prod.override.yml \
-  -f docker-compose.support.yml \
-  -f docker-compose.support.override.yml \
-  -f docker-compose.tunnel.yml \
-  --env-file .env up -d
-```
-
----
-
-## 🛠️ Telegram Bot – Features
-
-- **Download from YouTube**:  
-    `/make <url>` command pulls audio using yt-dlp (with cookie support).
-    
-- **Improved Metadata Search**:
-    
-    - Automatic MusicBrainz lookup for title/artist/album after download.
-        
-    - Paging and “manual” metadata entry supported.
-        
-    - Select from close matches or enter your own info.
-        
-- **Metadata JSON is saved and ready for the karaoke pipeline.**
-    
-
----
-
-## 📈 Monitoring & Alerting
-
-- **Prometheus** scrapes `/metrics` from status-api.
-    
-- **Alertmanager** sends critical notifications to Telegram or email.
-    
-- **Grafana** is included for dashboards.
-    
-- **Healthcheck endpoints** on every service for status and troubleshooting.
-    
-- **Pipeline errors** trigger Telegram notifications with details.
-    
+- **Multi-Container Architecture**: Modular microservices for watcher, metadata, splitter, packager, organizer, status-api, maintenance, and Telegram bot.
+- **CI/CD Integration**: Automated builds, tests, and linting with GitHub Actions and local dry-runs using [act](https://github.com/nektos/act) and `ci-preflight.sh`.
+- **Telegram Notifications**: Build results and failures are sent to your Telegram group or chat.
+- **Configurable with `.env`/secrets**: Works locally and in CI with GitHub secrets for credentials and tokens.
+- **Multi-Arch Docker Images**: Build and push to DockerHub and GHCR for both `amd64` and `arm64`.
+- **Pre-push Code Formatting**: Supports [autopep8](https://github.com/hhatto/autopep8) for consistent Python style across all services.
 
 ---
 
 ## 📦 Project Structure
 
 ```
-.
-├── watcher/           # Watches input, triggers pipeline
-├── metadata/          # Extracts MP3 metadata
-├── splitter/          # Splits audio into stems (Spleeter)
-├── packager/          # Repackages to karaoke MP3s
-├── organizer/         # Sorts into artist/album folders
-├── telegram_youtube_bot/ # Telegram bot: download + metadata
-├── maintenance/       # Cleanup and cron jobs
-├── status-api/        # Health, metrics, and file status API
-├── monitoring/        # Prometheus/Alertmanager config
-├── support/           # Jellyfin, Grafana, Deemix configs
-├── docker-compose.*.yml # Compose stacks and overrides
-├── .env.example       # Sample env config
+
+.  
+├── watcher/  
+├── metadata/  
+├── splitter/  
+├── packager/  
+├── organizer/  
+├── status-api/  
+├── maintenance/  
+├── telegram_youtube_bot/  
+├── shared/  
+├── .env.example  
+├── .github/  
+│ └── workflows/  
+│ └── docker-multi-build.yml  
+├── ci-preflight.sh  
 └── README.md
-```
+
+````
 
 ---
 
-## 💡 Common Commands
+## ⚡ Quick Start: Local Development
 
-**Start/stop the pipeline (prod):**
+### 1. **Clone the Repo**
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.prod.override.yml --env-file .env up -d
-docker compose down
-```
+git clone https://github.com/svidal-nlive/karaoke-mvp.git
+cd karaoke-mvp
+````
 
-**Start Cloudflare Tunnel:**
+### 2. **Set Up Your `.env`**
 
-```bash
-docker compose -f docker-compose.tunnel.yml --env-file .env up -d
-```
-
-**Start support services:**
+Copy the example file and fill in the required variables:
 
 ```bash
-docker compose -f docker-compose.support.yml -f docker-compose.support.override.yml --env-file .env up -d
+cp .env.example .env
+# Edit .env and provide required values (see below)
 ```
 
-**Initialize permissions:**
+**Required .env variables:**
+
+- Any microservice-level config (see `.env.example` for guidance)
+    
+- `DOCKERHUB_USER`, etc. (see secrets below)
+    
+
+### 3. **Install Prerequisites**
+
+- Docker & Docker Compose
+    
+- Python 3.11+
+    
+- (Optional for local CI dry-run) [act](https://github.com/nektos/act)
+    
+- (Optional for code formatting) `autopep8`:
+    
+    ```bash
+    pip install autopep8
+    ```
+    
+
+### 4. **Preflight CI Checks (Optional, Recommended)**
+
+Run this to simulate the CI build, lint, and push locally before you commit/push:
 
 ```bash
-docker compose -f docker-compose.init.yml --env-file .env up
+./ci-preflight.sh
 ```
 
-**Rebuild development images (live-reload):**
+- Lints GitHub Actions workflows
+    
+- Validates `.env`
+    
+- Runs [act](https://github.com/nektos/act) for a local CI dry-run (if installed)
+    
+- Dry-run builds all Docker images
+    
+
+### 5. **Run the Full Stack**
 
 ```bash
-docker compose -f docker-compose.dev.yml -f docker-compose.dev.override.yml --env-file .env up --build -d
+docker compose up --build
 ```
 
 ---
 
-## 🐳 CI/CD
+## 🛡️ CI/CD Pipeline (GitHub Actions)
 
-- **Images are built/pushed to Docker Hub & GHCR** via [GitHub Actions](https://chatgpt.com/c/.github/workflows/docker-multi-build.yml).
+- On every push to `main` (or a tagged release), [docker-multi-build.yml](https://chatgpt.com/c/.github/workflows/docker-multi-build.yml) will:
     
-- All services are built and linted independently.
+    - Lint & test each service
+        
+    - Build and push Docker images for each microservice to DockerHub & GHCR
+        
+    - Send a Telegram notification on success/failure
+        
+    - Run nightly scheduled builds for freshness
+        
+
+### GitHub Secrets Required (for CI)
+
+In your repo settings (`Settings > Secrets and variables > Actions > Repository secrets`):
+
+- `DOCKERHUB_USERNAME`
     
-- Custom healthchecks run for HTTP-exposed services.
+- `DOCKERHUB_TOKEN`
     
-- Telegram notifications are sent on build success/failure.
+- `TELEGRAM_BOT_TOKEN`
+    
+- `TELEGRAM_CHAT_ID`
+    
+
+These will override local `.env`/env vars for CI/CD runs.
+
+---
+
+## 🔔 Telegram Notification Setup
+
+1. **Create a bot:** [BotFather](https://t.me/botfather)
+    
+2. **Add your bot to a group or DM**
+    
+3. **Get the `chat_id`**: Use [this trick](https://stackoverflow.com/a/32572159) or ask the bot for `/start`.
+    
+4. **Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in GitHub Secrets (above)**
+    
+
+Notifications will be sent automatically during CI builds.
+
+---
+
+## 🎨 Code Formatting (autopep8)
+
+**To auto-format your whole repo (recommended before pushing):**
+
+```bash
+autopep8 . --in-place --recursive --aggressive --aggressive
+```
+
+---
+
+## 🏗️ Multi-Arch Docker Builds
+
+- The CI will build both `linux/amd64` and `linux/arm64` images for all services
+    
+- Images are tagged with `${IMAGE_TAG}` (git tag if present, else `latest`)
+    
+- Pushed to:
+    
+    - DockerHub: `${DOCKERHUB_USER}/karaoke-<service>:<tag>`
+        
+    - GHCR: `ghcr.io/<github_owner>/karaoke-<service>:<tag>`
+        
+
+---
+
+## 📝 Fresh Pull Checklist
+
+1. Clone repo and `cd karaoke-mvp`
+    
+2. Copy and edit `.env.example` to `.env`
+    
+3. Install Python, Docker, and autopep8 if needed
+    
+4. (Optional) Run `./ci-preflight.sh` to simulate CI pipeline locally
+    
+5. Run `docker compose up --build`
+    
+6. Check Telegram for build/push results (if using CI/CD)
     
 
 ---
 
-## 🛡️ Security & Notes
+## 💬 Need Help?
 
-- Never commit your real `.env`—use `.env.example` for safe sharing.
+- See `.env.example` for config tips
     
-- Keep `TUNNEL_TOKEN` and `TELEGRAM_BOT_TOKEN` secret.
+- File issues or PRs on [GitHub](https://github.com/svidal-nlive/karaoke-mvp)
     
-- All internal services run on an isolated Docker bridge network; only Cloudflare Tunnel exposes public endpoints.
-    
-- For self-hosted HTTPS, use Traefik/Nginx in addition to or instead of Cloudflare.
+- For Telegram notifications, check [Bot API docs](https://core.telegram.org/bots/api#sendmessage)
     
 
 ---
 
-## 🤝 Contributing
-
-- Fork and PRs welcome!
-    
-- Please lint Python code with `flake8` before submitting.
-    
-- For new microservices, update Compose files and CI workflow.
-    
+Happy karaoke hacking! 🎤
 
 ---
-
-## 📚 FAQ
-
-**Q: Where do I get a YouTube cookies file?**  
-A: Use browser extensions like [Get cookies.txt](https://www.getcookies.txt/) to export your logged-in YouTube cookies.
-
-**Q: How do I use my own stack prefix or network?**  
-A: Set `STACK_PREFIX` and `BACKEND_NETWORK` in your `.env`.
-
-**Q: How do I add new support services?**  
-A: Create/modify `docker-compose.support.yml` and the matching `.override.yml`.
-
----
-
-## ✨ Credits
-
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-    
-- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
-    
-- [MusicBrainz](https://musicbrainz.org/)
-    
-- [Spleeter](https://github.com/deezer/spleeter)
-    
-- [Flask](https://flask.palletsprojects.com/)
-    
-
----
-
-** Questions or bugs? Open an issue or ping the Telegram channel set in your `.env`!
