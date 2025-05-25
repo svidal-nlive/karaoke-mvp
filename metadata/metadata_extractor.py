@@ -40,6 +40,7 @@ META_DIR = os.environ.get("META_DIR", "/metadata/json")
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
 RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 5))
 
+
 def extract_metadata(mp3_path):
     try:
         audio = MP3(mp3_path)
@@ -55,6 +56,7 @@ def extract_metadata(mp3_path):
     except Exception as e:
         logger.error(f"Metadata extraction failed for {mp3_path}: {e}")
         return None
+
 
 def run_extractor():
     os.makedirs(META_DIR, exist_ok=True)
@@ -100,11 +102,14 @@ def run_extractor():
                 redis_client.incr(f"metadata_retries:{file}")
         time.sleep(2)
 
+
 app = Flask(__name__)
+
 
 @app.route("/health")
 def health():
     return "ok", 200
+
 
 if __name__ == "__main__":
     t = threading.Thread(target=run_extractor, daemon=True)

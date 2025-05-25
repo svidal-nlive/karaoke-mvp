@@ -40,6 +40,8 @@ YTDLP_COOKIES = os.environ.get("YT_DLP_COOKIES_FILE", "/cookies/cookies.txt")
 AWAITING_METADATA = 1
 
 # Helper: Download YouTube audio (with cookies if present)
+
+
 def download_youtube_audio(url, output_dir=INPUT_DIR):
     ydl_opts = {
         "format": "bestaudio/best",
@@ -65,6 +67,8 @@ def download_youtube_audio(url, output_dir=INPUT_DIR):
         return filename, info.get("title", "")
 
 # Save metadata as JSON
+
+
 def save_metadata_json(base_name, metadata):
     os.makedirs(META_DIR, exist_ok=True)
     json_path = os.path.join(META_DIR, f"{base_name}.mp3.json")
@@ -73,6 +77,8 @@ def save_metadata_json(base_name, metadata):
     return json_path
 
 # MusicBrainz fuzzy search
+
+
 async def musicbrainz_search(title, artist=""):
     musicbrainzngs.set_useragent("KaraokePipeline", "1.0", "https://yourdomain.com")
     try:
@@ -99,6 +105,8 @@ async def musicbrainz_search(title, artist=""):
         return []
 
 # Helper: Show paged search results
+
+
 async def show_search_options(update, context, page=0, page_size=4):
     options = context.user_data.get("match_options", [])
     total = len(options)
@@ -122,10 +130,13 @@ async def show_search_options(update, context, page=0, page_size=4):
     await update.message.reply_text(msg)
 
 # Telegram commands
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Send /make <youtube-url> to process a new song."
     )
+
 
 async def make(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -158,6 +169,7 @@ async def make(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"Error: {e}")
         return ConversationHandler.END
+
 
 async def receive_metadata(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -225,9 +237,11 @@ async def receive_metadata(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Cancelled.", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
+
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -248,6 +262,7 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()

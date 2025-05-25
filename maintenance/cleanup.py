@@ -36,6 +36,7 @@ SUFFIX_MAP = {
     "output": ["_karaoke.mp3"],
 }
 
+
 def list_cleanable_files():
     """
     Return a list of (stage, path_to_delete) for completed files no longer in active Redis states.
@@ -67,6 +68,7 @@ def list_cleanable_files():
             if namebase in organized:
                 clean_targets.append(item_path)
     return clean_targets
+
 
 def main():
     parser = argparse.ArgumentParser(description="Cleanup residual pipeline files.")
@@ -101,6 +103,7 @@ def main():
         print("=== DRY RUN: Files/directories that would be cleaned up ===")
         for path in files_to_delete:
             print(path)
+
 
 if __name__ == "__main__":
     main()

@@ -41,6 +41,7 @@ MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
 RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 10))
 CHUNK_LENGTH_MS = int(os.environ.get("CHUNK_LENGTH_MS", 30000))
 
+
 def process_file(file_path, song_name):
     """Split an MP3 into stems in chunks, merge results, write output."""
     for attempt in range(1, MAX_RETRIES + 1):
@@ -97,6 +98,7 @@ def process_file(file_path, song_name):
             else:
                 return str(e)
 
+
 def main():
     while True:
         files = get_files_by_status("metadata_extracted")
@@ -137,6 +139,7 @@ def main():
                 )
                 redis_client.incr(f"splitter_retries:{file}")
         time.sleep(5)
+
 
 if __name__ == "__main__":
     main()

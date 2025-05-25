@@ -42,6 +42,7 @@ OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/output")
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
 RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 5))
 
+
 def robust_load_metadata(meta_path):
     """Load metadata JSON, falling back to defaults if not present."""
     fallback = {
@@ -63,6 +64,7 @@ def robust_load_metadata(meta_path):
         logger.error(f"Metadata JSON error in {meta_path}: {e}")
         return fallback
 
+
 def clean_mp3_tags(mp3_path, meta):
     audio = MP3(mp3_path)
     audio.delete()
@@ -76,6 +78,7 @@ def clean_mp3_tags(mp3_path, meta):
     audio.tags.add(TPE1(encoding=3, text=meta.get("TPE1")))
     audio.tags.add(TALB(encoding=3, text=meta.get("TALB")))
     audio.save()
+
 
 def apply_metadata(instrumental_path, meta_path, out_path):
     audio = AudioSegment.from_wav(instrumental_path)
@@ -96,6 +99,7 @@ def apply_metadata(instrumental_path, meta_path, out_path):
                 )
             )
         audiofile.save()
+
 
 def run_packager():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -145,6 +149,7 @@ def run_packager():
                 )
                 redis_client.incr(f"packager_retries:{file}")
         time.sleep(2)
+
 
 if __name__ == "__main__":
     run_packager()

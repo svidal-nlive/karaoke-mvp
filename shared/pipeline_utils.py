@@ -60,6 +60,8 @@ LOGS_DIR = os.environ.get("LOGS_DIR", "/logs")
 redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 # -------- STRING SANITIZATION --------
+
+
 def clean_string(s):
     """Sanitize input for safe filesystem usage."""
     if not isinstance(s, str):
@@ -68,6 +70,8 @@ def clean_string(s):
     return s.replace("\x00", "").replace("/", "-").replace("\\", "-").strip()
 
 # -------- STATUS & ERROR MANAGEMENT --------
+
+
 def set_file_status(filename, status, error=None, extra=None):
     """Set file status in Redis, optionally adding error or extra info."""
     key = f"file:{filename}"
@@ -80,6 +84,7 @@ def set_file_status(filename, status, error=None, extra=None):
         redis_client.hset(key, mapping=value)
     except Exception as e:
         logger.error(f"Redis set_file_status error: {e}")
+
 
 def get_files_by_status(status):
     """List all files in Redis with the given status."""
@@ -98,9 +103,11 @@ def get_files_by_status(status):
             continue
     return files
 
+
 def set_file_error(filename, error):
     """Set status to error, attach error details."""
     set_file_status(filename, "error", error=error)
+
 
 def clear_file_error(filename):
     """Remove error status from file (set to queued, clear retries)."""
@@ -114,6 +121,8 @@ def clear_file_error(filename):
         logger.error(f"Redis clear_file_error error: {e}")
 
 # -------- HARDENED NOTIFICATIONS --------
+
+
 def send_telegram_message(message):
     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -127,6 +136,7 @@ def send_telegram_message(message):
     else:
         logger.info("Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set.")
 
+
 def send_slack_message(message):
     if SLACK_WEBHOOK_URL:
         try:
@@ -137,6 +147,7 @@ def send_slack_message(message):
             logger.warning(f"Slack notification error: {e}")
     else:
         logger.info("Slack notification skipped: SLACK_WEBHOOK_URL not set.")
+
 
 def send_email(subject, message):
     if NOTIFY_EMAILS and SMTP_SERVER and SMTP_USERNAME and SMTP_PASSWORD:
@@ -155,12 +166,15 @@ def send_email(subject, message):
     else:
         logger.info("Email notification skipped: NOTIFY_EMAILS or SMTP config not set.")
 
+
 def notify_all(subject, message):
     send_telegram_message(message)
     send_slack_message(message)
     send_email(subject, message)
 
 # -------- RETRY UTILITIES --------
+
+
 def get_retry_count(stage, filename):
     """Return the current retry count for this stage/filename."""
     try:
@@ -168,6 +182,7 @@ def get_retry_count(stage, filename):
     except Exception as e:
         logger.error(f"Redis get_retry_count error: {e}")
         return 0
+
 
 def increment_retry(stage, filename):
     """Increment and return the retry count for this stage/filename."""
@@ -178,6 +193,7 @@ def increment_retry(stage, filename):
         logger.error(f"Redis increment_retry error: {e}")
     return retries
 
+
 def reset_retry(stage, filename):
     """Clear retry counter for stage/filename."""
     try:
@@ -186,6 +202,8 @@ def reset_retry(stage, filename):
         logger.error(f"Redis reset_retry error: {e}")
 
 # -------- GENERIC AUTO-RETRY LOGIC --------
+
+
 def handle_auto_retry(
     stage, filename, func, max_retries=3, retry_delay=5, notify_fail=True
 ):
@@ -220,6 +238,8 @@ def handle_auto_retry(
                 raise
 
 # -------- FILE STATUS SUMMARY --------
+
+
 def get_file_status(filename):
     """Return status and last error for the given file from Redis."""
     key = f"file:{filename}"
@@ -239,6 +259,8 @@ def get_file_status(filename):
         }
 
 # -------- HEALTHCHECK UTILS --------
+
+
 def health_response():
     """Simple Flask healthcheck endpoint."""
     return "ok", 200

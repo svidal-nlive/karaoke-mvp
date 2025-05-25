@@ -8,8 +8,10 @@ EXCLUDE_DIRS_CONTENT = ['node_modules', 'build', '.git', 'deemix_config', 'doubl
 EXCLUDE_DIRS_TREE = ['node_modules', 'build', '.git', 'deemix_config', 'doublecommander_config', 'grafana_data', 'jellyfin']
 # ---------------------
 
+
 def should_exclude(path_parts, exclude_list):
     return any(part in exclude_list for part in path_parts)
+
 
 def print_tree(root, prefix=""):
     """Recursively print directory tree, respecting EXCLUDE_DIRS_TREE and PermissionError."""
@@ -30,9 +32,11 @@ def print_tree(root, prefix=""):
             extension = '    ' if index == len(entries) - 1 else '│   '
             print_tree(path, prefix + extension)
 
+
 def file_matches(filename, include_types):
     """Return True if filename matches any pattern in include_types."""
     return any(fnmatch.fnmatch(filename, pattern) for pattern in include_types)
+
 
 def print_contents(root, include_types, dry_run=False):
     """Find and print contents of files matching include_types, with options."""
@@ -58,6 +62,7 @@ def print_contents(root, include_types, dry_run=False):
                         print(f"[Permission Denied]: {rel_path}")
                     except Exception as e:
                         print(f"Error reading {rel_path}: {e}")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -85,6 +90,7 @@ def main():
     print_tree(BASE_DIR)
     print("\n" + ("DRY RUN: Filenames only" if args.dry_run else "Printing file contents") + "\n")
     print_contents(BASE_DIR, include_types, dry_run=args.dry_run)
+
 
 if __name__ == '__main__':
     main()

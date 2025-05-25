@@ -38,6 +38,7 @@ INPUT_DIR = os.environ.get("INPUT_DIR", "/input")
 QUEUE_DIR = os.environ.get("QUEUE_DIR", "/queue")
 STABILITY_CHECKS = int(os.environ.get("FILE_STABILITY_CHECKS", 4))
 
+
 class MP3Handler(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory or not event.src_path.endswith(".mp3"):
@@ -79,6 +80,7 @@ class MP3Handler(FileSystemEventHandler):
                 f"Error in watcher for {fname} at {timestamp}:\n{e}",
             )
 
+
 def run_watcher():
     os.makedirs(QUEUE_DIR, exist_ok=True)
     event_handler = MP3Handler()
@@ -93,11 +95,14 @@ def run_watcher():
         observer.stop()
     observer.join()
 
+
 app = Flask(__name__)
+
 
 @app.route("/health")
 def health():
     return "ok", 200
+
 
 if __name__ == "__main__":
     t = threading.Thread(target=run_watcher, daemon=True)
