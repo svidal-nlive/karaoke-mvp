@@ -28,6 +28,9 @@ Thumbs.db
 *.bak
 *~
 
-# Jellyfin data (optional)
-jellyfin/library
-grafana_data
+# -----------------------------------------------------------------------------
+# Ignore local persistent data/config for support services (host-mount option)
+# -----------------------------------------------------------------------------
+support/jellyfin/config/
+support/jellyfin/cache/
+support/grafana_data/

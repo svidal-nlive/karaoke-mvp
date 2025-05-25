@@ -17,15 +17,30 @@ from shared.pipeline_utils import (
 import traceback
 import datetime
 
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+LEVELS = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+    "HEALTH": logging.INFO,
+}
+
+logging.basicConfig(
+    level=LEVELS.get(LOG_LEVEL, logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
+logger.info(f"Logging initialized at {LOG_LEVEL} level")
+
 # --- Config: override via ENV ---
 STEMS_DIR = os.environ.get("STEMS_DIR", "/stems")
 META_DIR = os.environ.get("META_DIR", "/metadata/json")
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/output")
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
 RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 5))
-
-logging.basicConfig(level=logging.INFO)
-
 
 def robust_load_metadata(meta_path):
     """Load metadata JSON, falling back to defaults if not present."""
@@ -35,7 +50,7 @@ def robust_load_metadata(meta_path):
         "TALB": "Unknown Album",
     }
     if not os.path.exists(meta_path):
-        logging.warning(f"Metadata file missing: {meta_path}")
+        logger.warning(f"Metadata file missing: {meta_path}")
         return fallback
     try:
         with open(meta_path, "r", encoding="utf-8") as f:
@@ -45,9 +60,8 @@ def robust_load_metadata(meta_path):
                 meta[k] = fallback[k]
         return meta
     except Exception as e:
-        logging.error(f"Metadata JSON error in {meta_path}: {e}")
+        logger.error(f"Metadata JSON error in {meta_path}: {e}")
         return fallback
-
 
 def clean_mp3_tags(mp3_path, meta):
     audio = MP3(mp3_path)
@@ -62,7 +76,6 @@ def clean_mp3_tags(mp3_path, meta):
     audio.tags.add(TPE1(encoding=3, text=meta.get("TPE1")))
     audio.tags.add(TALB(encoding=3, text=meta.get("TALB")))
     audio.save()
-
 
 def apply_metadata(instrumental_path, meta_path, out_path):
     audio = AudioSegment.from_wav(instrumental_path)
@@ -83,7 +96,6 @@ def apply_metadata(instrumental_path, meta_path, out_path):
                 )
             )
         audiofile.save()
-
 
 def run_packager():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -133,7 +145,6 @@ def run_packager():
                 )
                 redis_client.incr(f"packager_retries:{file}")
         time.sleep(2)
-
 
 if __name__ == "__main__":
     run_packager()

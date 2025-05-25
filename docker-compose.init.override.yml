@@ -1,37 +1,37 @@
 services:
-  ${STACK_PREFIX}_watcher:
+  ${STACK_PREFIX}_init_chown_input:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_metadata:
+  ${STACK_PREFIX}_init_chown_queue:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_splitter:
+  ${STACK_PREFIX}_init_chown_stems:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_packager:
+  ${STACK_PREFIX}_init_chown_output:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_organizer:
+  ${STACK_PREFIX}_init_chown_organized:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_status_api:
+  ${STACK_PREFIX}_init_chown_metadata_json:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_maintenance:
+  ${STACK_PREFIX}_init_chown_splitter_tmp:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_telegram_youtube_bot:
+  ${STACK_PREFIX}_init_chown_grafana_config:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_redis:
+  ${STACK_PREFIX}_init_chown_jellyfin_config:
     networks:
       - ${BACKEND_NETWORK}
 

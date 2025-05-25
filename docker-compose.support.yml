@@ -1,105 +1,101 @@
+# -----------------------------------------------------------------------------
+# docker-compose.support.yml
+# Karaoke MVP - Support/Ancillary Services Compose
+#
+# - Runs support/utility services (Deemix, Jellyfin, Prometheus, Grafana, Alertmanager, etc.)
+# - Uses named volumes prefixed by ${STACK_PREFIX}.
+# - Prometheus/Alertmanager configs are read from ./monitoring.
+# - Custom configs for Grafana and Jellyfin supported via ./support/grafana_data and ./support/jellyfin
+# -----------------------------------------------------------------------------
+
+version: "3.8"
+
 services:
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: tunnel
+  ${STACK_PREFIX}_deemix:
+    image: registry.gitlab.com/bockiii/deemix-docker:latest
+    container_name: ${STACK_PREFIX}_deemix
     restart: unless-stopped
-    command: tunnel run
     environment:
-      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
-    # Uncomment if you want it to join a named network, see 'networks:' section
-
-  jellyfin:
-    image: lscr.io/linuxserver/jellyfin:latest
-    container_name: jellyfin
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/New_York}
-      # Optional: change to your host’s IP or desired public URL
-      - JELLYFIN_PublishedServerUrl=http://127.0.0.1
-    volumes:
-      - ./jellyfin/library:/config
-      - organized:/organized
+      - TZ=${TZ}
     ports:
-      - 8096:8096
-      - 8920:8920
-      - 7359:7359/udp
-      - 1900:1900/udp
-    restart: unless-stopped
-
-  deemix:
-    image: registry.gitlab.com/bockiii/deemix-docker
-    container_name: deemix
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - UMASK_SET=022
+      - "127.0.0.1:6595:6595"
     volumes:
-      - input:/downloads
-      - ./deemix_config:/config
-    ports:
-      - 6595:6595
-    restart: unless-stopped
+      - ${STACK_PREFIX}_deemix_config:/config
+      - ${STACK_PREFIX}_input:/downloads
 
-  doublecommander:
-    image: lscr.io/linuxserver/doublecommander:latest
-    container_name: doublecommander
+  ${STACK_PREFIX}_jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: ${STACK_PREFIX}_jellyfin
+    restart: unless-stopped
     environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-    volumes:
-      - input:/karaoke-mvp/input
-      - output:/karaoke-mvp/output
-      - stems:/karaoke-mvp/stems
-      - queue:/karaoke-mvp/queue
-      - metadata_json:/karaoke-mvp/metadata/json
-      - organized:/karaoke-mvp/organized
-      - ./models:/karaoke-mvp/models
-      - splitter_tmp:/karaoke-mvp/splitter-tmp
-      - ./doublecommander_config:/config
+      - TZ=${TZ}
     ports:
-      - 3000:3000
-    restart: unless-stopped
+      - "127.0.0.1:8096:8096"
+    volumes:
+      - ${STACK_PREFIX}_jellyfin_config:/config
+      - ${STACK_PREFIX}_jellyfin_cache:/cache
+      - ${STACK_PREFIX}_input:/media:ro
+      - ${STACK_PREFIX}_output:/output:ro
+      - ./support/jellyfin:/custom-config:ro   # <-- Custom Jellyfin configs (optional)
 
-  prometheus:
+  ${STACK_PREFIX}_prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
-    ports:
-      - "9090:9090"
+    container_name: ${STACK_PREFIX}_prometheus
     restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
+    user: root
     ports:
-      - "3001:3000"
+      - "127.0.0.1:9090:9090"
     volumes:
-      - ./grafana_data:/var/lib/grafana
-    restart: unless-stopped
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${STACK_PREFIX}_prometheus_data:/prometheus
 
-  alertmanager:
+  ${STACK_PREFIX}_alertmanager:
     image: prom/alertmanager:latest
-    container_name: alertmanager
-    volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - ./telegram.tmpl:/etc/alertmanager/telegram.tmpl:ro
-    ports:
-      - "9093:9093"
+    container_name: ${STACK_PREFIX}_alertmanager
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alert.rules.yml:/etc/alertmanager/alert.rules.yml:ro
+      - ./monitoring/telegram.tmpl:/etc/alertmanager/telegram.tmpl:ro
+      - ${STACK_PREFIX}_alertmanager_data:/alertmanager
 
-# Volumes are declared here for compose reference but are owned/created by the main stack.
+  ${STACK_PREFIX}_grafana:
+    image: grafana/grafana:latest
+    container_name: ${STACK_PREFIX}_grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ${STACK_PREFIX}_grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-provisioning:/etc/grafana/provisioning:ro
+      - ./support/grafana_data:/custom-grafana:ro   # <-- Custom Grafana configs (optional)
+
+  # Optional: Telegram Alert Bot (if separate from pipeline)
+  # ${STACK_PREFIX}_telegram_alertbot:
+  #   image: some/telegram-alert-bot:latest
+  #   container_name: ${STACK_PREFIX}_telegram_alertbot
+  #   environment:
+  #     - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+  #     - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - ${STACK_PREFIX}_alertmanager
+
+# -------------------------------
+# Named Volumes (with stack prefix)
+# -------------------------------
 volumes:
-  input:
-  queue:
-  metadata_json:
-  stems:
-  output:
-  organized:
-  splitter_tmp:
-
-networks:
-  default:
-    name: karaoke-mvp_default
+  ${STACK_PREFIX}_deemix_config:
+  ${STACK_PREFIX}_jellyfin_config:
+  ${STACK_PREFIX}_jellyfin_cache:
+  ${STACK_PREFIX}_prometheus_data:
+  ${STACK_PREFIX}_alertmanager_data:
+  ${STACK_PREFIX}_grafana_data:
+  # shared volumes from pipeline
+  ${STACK_PREFIX}_input:
+  ${STACK_PREFIX}_output:

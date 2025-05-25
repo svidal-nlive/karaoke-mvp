@@ -17,14 +17,28 @@ from shared.pipeline_utils import (
 import traceback
 import datetime
 
-# --- Config ---
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+LEVELS = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+    "HEALTH": logging.INFO,
+}
+
+logging.basicConfig(
+    level=LEVELS.get(LOG_LEVEL, logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
+logger.info(f"Logging initialized at {LOG_LEVEL} level")
+
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/output")
 ORG_DIR = os.environ.get("ORG_DIR", "/organized")
 META_DIR = os.environ.get("META_DIR", "/metadata/json")
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
-
-logging.basicConfig(level=logging.INFO)
-
 
 def get_metadata_from_json(file_path):
     """Reads artist/album/title metadata from JSON file, or uses defaults."""
@@ -42,11 +56,9 @@ def get_metadata_from_json(file_path):
             pass
     return "UnknownArtist", "UnknownAlbum", os.path.splitext(base)[0]
 
-
 def is_valid_karaoke_mp3(filename):
     """Checks if a file is a karaoke mp3 by naming convention."""
     return filename.endswith("_karaoke.mp3")
-
 
 def organize_file(file_path, file):
     try:
@@ -72,7 +84,6 @@ def organize_file(file_path, file):
             "Karaoke Pipeline Error", f"Organizer error for {file} at {timestamp}:\n{e}"
         )
         redis_client.incr(f"organizer_retries:{file}")
-
 
 def run_organizer():
     os.makedirs(ORG_DIR, exist_ok=True)
@@ -106,14 +117,11 @@ def run_organizer():
                 redis_client.incr(f"organizer_retries:{file}")
         time.sleep(10)
 
-
 app = Flask(__name__)
-
 
 @app.route("/health")
 def health():
     return "ok", 200
-
 
 if __name__ == "__main__":
     t = threading.Thread(target=run_organizer, daemon=True)

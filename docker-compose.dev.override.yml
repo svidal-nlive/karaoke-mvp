@@ -1,37 +1,37 @@
 services:
-  ${STACK_PREFIX}_watcher:
+  ${STACK_PREFIX}_dev_redis:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_metadata:
+  ${STACK_PREFIX}_dev_watcher:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_splitter:
+  ${STACK_PREFIX}_dev_metadata:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_packager:
+  ${STACK_PREFIX}_dev_splitter:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_organizer:
+  ${STACK_PREFIX}_dev_packager:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_status_api:
+  ${STACK_PREFIX}_dev_organizer:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_maintenance:
+  ${STACK_PREFIX}_dev_status_api:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_telegram_youtube_bot:
+  ${STACK_PREFIX}_dev_maintenance:
     networks:
       - ${BACKEND_NETWORK}
 
-  ${STACK_PREFIX}_redis:
+  ${STACK_PREFIX}_dev_telegram_youtube_bot:
     networks:
       - ${BACKEND_NETWORK}
 

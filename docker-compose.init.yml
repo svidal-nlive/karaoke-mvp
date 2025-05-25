@@ -1,0 +1,91 @@
+# -----------------------------------------------------------------------------
+# docker-compose.init.yml
+# Karaoke MVP - Init Compose
+#
+# - One-off containers to fix/set file/folder permissions, create structure, etc.
+# - Volumes are named and prefixed using ${STACK_PREFIX} from .env.
+# - Should be run manually as needed, e.g. after fresh clone or volume reset.
+#
+# Usage: docker compose -f docker-compose.init.yml --env-file .env up
+# -----------------------------------------------------------------------------
+
+version: "3.8"
+
+services:
+  ${STACK_PREFIX}_init_chown_input:
+    image: alpine:3.19
+    container_name: ${STACK_PREFIX}_init_chown_input
+    command: ["sh", "-c", "mkdir -p /input && chown -R ${APP_UID}:${APP_GID} /input"]
+    volumes:
+      - ${STACK_PREFIX}_input:/input
+
+  ${STACK_PREFIX}_init_chown_queue:
+    image: alpine:3.19
+    container_name: ${STACK_PREFIX}_init_chown_queue
+    command: ["sh", "-c", "mkdir -p /queue && chown -R ${APP_UID}:${APP_GID} /queue"]
+    volumes:
+      - ${STACK_PREFIX}_queue:/queue
+
+  ${STACK_PREFIX}_init_chown_stems:
+    image: alpine:3.19
+    container_name: ${STACK_PREFIX}_init_chown_stems
+    command: ["sh", "-c", "mkdir -p /stems && chown -R ${APP_UID}:${APP_GID} /stems"]
+    volumes:
+      - ${STACK_PREFIX}_stems:/stems
+
+  ${STACK_PREFIX}_init_chown_output:
+    image: alpine:3.19
+    container_name: ${STACK_PREFIX}_init_chown_output
+    command: ["sh", "-c", "mkdir -p /output && chown -R ${APP_UID}:${APP_GID} /output"]
+    volumes:
+      - ${STACK_PREFIX}_output:/output
+
+  ${STACK_PREFIX}_init_chown_organized:
+    image: alpine:3.19
+    container_name: ${STACK_PREFIX}_init_chown_organized
+    command: ["sh", "-c", "mkdir -p /organized && chown -R ${APP_UID}:${APP_GID} /organized"]
+    volumes:
+      - ${STACK_PREFIX}_organized:/organized
+
+  ${STACK_PREFIX}_init_chown_metadata_json:
+    image: alpine:3.19
+    container_name: ${STACK_PREFIX}_init_chown_metadata_json
+    command: ["sh", "-c", "mkdir -p /metadata/json && chown -R ${APP_UID}:${APP_GID} /metadata/json"]
+    volumes:
+      - ${STACK_PREFIX}_metadata_json:/metadata/json
+
+  ${STACK_PREFIX}_init_chown_splitter_tmp:
+    image: alpine:3.19
+    container_name: ${STACK_PREFIX}_init_chown_splitter_tmp
+    command: ["sh", "-c", "mkdir -p /tmp && chown -R ${APP_UID}:${APP_GID} /tmp"]
+    volumes:
+      - ${STACK_PREFIX}_splitter_tmp:/tmp
+
+  # Optional support configs (add if customizing support configs with named volumes)
+  ${STACK_PREFIX}_init_chown_grafana_config:
+    image: alpine:3.19
+    container_name: ${STACK_PREFIX}_init_chown_grafana_config
+    command: ["sh", "-c", "mkdir -p /grafana_config && chown -R ${APP_UID}:${APP_GID} /grafana_config"]
+    volumes:
+      - ${STACK_PREFIX}_grafana_config:/grafana_config
+
+  ${STACK_PREFIX}_init_chown_jellyfin_config:
+    image: alpine:3.19
+    container_name: ${STACK_PREFIX}_init_chown_jellyfin_config
+    command: ["sh", "-c", "mkdir -p /jellyfin_config && chown -R ${APP_UID}:${APP_GID} /jellyfin_config"]
+    volumes:
+      - ${STACK_PREFIX}_jellyfin_config:/jellyfin_config
+
+# -------------------------------
+# Named Volumes (matching dev/prod/support)
+# -------------------------------
+volumes:
+  ${STACK_PREFIX}_input:
+  ${STACK_PREFIX}_queue:
+  ${STACK_PREFIX}_stems:
+  ${STACK_PREFIX}_output:
+  ${STACK_PREFIX}_organized:
+  ${STACK_PREFIX}_splitter_tmp:
+  ${STACK_PREFIX}_metadata_json:
+  ${STACK_PREFIX}_grafana_config:
+  ${STACK_PREFIX}_jellyfin_config:

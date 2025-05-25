@@ -3,7 +3,7 @@ import argparse
 import fnmatch
 
 # --- Configuration ---
-DEFAULT_INCLUDE_TYPES = ['Dockerfile', '*.py', '*.txt', '*.log', '*.yml', '*.env', '.gitignore', '.dockerignore']
+DEFAULT_INCLUDE_TYPES = ['*.py', '*.txt', '*.log', '*.yml', '*.env', '.gitignore', '.dockerignore']
 EXCLUDE_DIRS_CONTENT = ['node_modules', 'build', '.git', 'deemix_config', 'doublecommander_config', 'grafana_data', 'jellyfin']
 EXCLUDE_DIRS_TREE = ['node_modules', 'build', '.git', 'deemix_config', 'doublecommander_config', 'grafana_data', 'jellyfin']
 # ---------------------

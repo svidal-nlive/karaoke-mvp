@@ -2,17 +2,32 @@ import os
 import argparse
 import shutil
 import logging
-from shared.pipeline_utils import redis_client
+from shared.pipeline_utils import redis_client, notify_all
 
-# Logging for troubleshooting
-logging.basicConfig(level=logging.INFO)
+# Logging config
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+LEVELS = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+    "HEALTH": logging.INFO,
+}
+logging.basicConfig(
+    level=LEVELS.get(LOG_LEVEL, logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
+logger.info(f"Logging initialized at {LOG_LEVEL} level")
 
-# --- Config ---
+# --- Config (now supports ENV for all paths) ---
 PIPELINE_CLEAN_TARGETS = {
-    "metadata": "/metadata/json",
-    "queue": "/queue",
-    "stems": "/stems",
-    "output": "/output",
+    "metadata": os.environ.get("META_DIR", "/metadata/json"),
+    "queue": os.environ.get("QUEUE_DIR", "/queue"),
+    "stems": os.environ.get("STEMS_DIR", "/stems"),
+    "output": os.environ.get("OUTPUT_DIR", "/output"),
 }
 SUFFIX_MAP = {
     "metadata": [".mp3.json", "_cover.jpg"],
@@ -21,13 +36,11 @@ SUFFIX_MAP = {
     "output": ["_karaoke.mp3"],
 }
 
-
 def list_cleanable_files():
     """
     Return a list of (stage, path_to_delete) for completed files no longer in active Redis states.
     """
     clean_targets = []
-    # Get all organized files from redis (finished files)
     organized_files = redis_client.keys("file:*")
     organized = set()
     for k in organized_files:
@@ -36,20 +49,15 @@ def list_cleanable_files():
             base = k.replace("file:", "")
             namebase = os.path.splitext(base)[0]
             organized.add(namebase)
-
-    # Now scan all cleanup dirs for files/dirs that match these organized bases
     for stage, dir_path in PIPELINE_CLEAN_TARGETS.items():
         abs_dir = dir_path
         if not os.path.exists(abs_dir):
             continue
-        # Handle both files and dirs depending on stage
         for item in os.listdir(abs_dir):
             item_path = os.path.join(abs_dir, item)
-            # For stems (dirs), rest are files
             if stage == "stems":
                 namebase = item
             else:
-                # Try to match file base
                 for suffix in SUFFIX_MAP[stage]:
                     if item.endswith(suffix):
                         namebase = item.replace(suffix, "")
@@ -59,7 +67,6 @@ def list_cleanable_files():
             if namebase in organized:
                 clean_targets.append(item_path)
     return clean_targets
-
 
 def main():
     parser = argparse.ArgumentParser(description="Cleanup residual pipeline files.")
@@ -78,24 +85,22 @@ def main():
     if args.live:
         print("=== LIVE CLEANUP: Deleting the following ===")
         for path in files_to_delete:
-            if os.path.isfile(path):
-                print(f"Deleting file: {path}")
-                try:
+            try:
+                if os.path.isfile(path):
+                    print(f"Deleting file: {path}")
                     os.remove(path)
-                except Exception as e:
-                    print(f"Error deleting file {path}: {e}")
-            elif os.path.isdir(path):
-                print(f"Deleting directory: {path}")
-                try:
+                elif os.path.isdir(path):
+                    print(f"Deleting directory: {path}")
                     shutil.rmtree(path)
-                except Exception as e:
-                    print(f"Error deleting dir {path}: {e}")
+                notify_all("Maintenance Cleaned File", f"🧹 Deleted: {path}")
+            except Exception as e:
+                print(f"Error deleting {path}: {e}")
+                notify_all("Maintenance Error", f"❌ Error deleting {path}: {e}")
         print("Cleanup complete.")
     else:
         print("=== DRY RUN: Files/directories that would be cleaned up ===")
         for path in files_to_delete:
             print(path)
-
 
 if __name__ == "__main__":
     main()

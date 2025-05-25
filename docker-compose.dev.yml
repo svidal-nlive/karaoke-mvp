@@ -1,0 +1,249 @@
+# -----------------------------------------------------------------------------
+# docker-compose.dev.yml
+# Karaoke MVP - Local Development Compose
+#
+# - Builds all core services from source for live development.
+# - All services/volumes are prefixed by ${STACK_PREFIX} for isolation.
+# - Optionally mounts custom config folders for Grafana/Jellyfin via ./support.
+# -----------------------------------------------------------------------------
+
+version: "3.8"
+
+services:
+  ${STACK_PREFIX}_dev_redis:
+    image: redis:7-alpine
+    container_name: ${STACK_PREFIX}_dev_redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  ${STACK_PREFIX}_dev_watcher:
+    build: ./watcher
+    container_name: ${STACK_PREFIX}_dev_watcher
+    depends_on:
+      ${STACK_PREFIX}_dev_redis:
+        condition: service_healthy
+    volumes:
+      - ${STACK_PREFIX}_input:/input
+      - ${STACK_PREFIX}_queue:/queue
+      - ./shared:/app/shared:ro
+    environment:
+      - REDIS_HOST=${STACK_PREFIX}_dev_redis
+      - LOG_LEVEL=${LOG_LEVEL}
+      - CHUNK_LENGTH_MS=${CHUNK_LENGTH_MS}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - INPUT_DIR=/input
+      - QUEUE_DIR=/queue
+      - LOGS_DIR=/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      retries: 3
+
+  ${STACK_PREFIX}_dev_metadata:
+    build: ./metadata
+    container_name: ${STACK_PREFIX}_dev_metadata
+    depends_on:
+      ${STACK_PREFIX}_dev_watcher:
+        condition: service_healthy
+      ${STACK_PREFIX}_dev_redis:
+        condition: service_healthy
+    volumes:
+      - ${STACK_PREFIX}_queue:/queue
+      - ${STACK_PREFIX}_metadata_json:/metadata/json
+      - ./shared:/app/shared:ro
+    environment:
+      - REDIS_HOST=${STACK_PREFIX}_dev_redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - QUEUE_DIR=/queue
+      - META_DIR=/metadata/json
+      - LOGS_DIR=/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      retries: 3
+
+  ${STACK_PREFIX}_dev_splitter:
+    build: ./splitter
+    container_name: ${STACK_PREFIX}_dev_splitter
+    depends_on:
+      ${STACK_PREFIX}_dev_metadata:
+        condition: service_healthy
+      ${STACK_PREFIX}_dev_redis:
+        condition: service_healthy
+    volumes:
+      - ${STACK_PREFIX}_queue:/queue
+      - ${STACK_PREFIX}_stems:/stems
+      - ${STACK_PREFIX}_splitter_tmp:/tmp
+      - ./models:/app/pretrained_models:ro
+      - ./shared:/app/shared:ro
+    environment:
+      - REDIS_HOST=${STACK_PREFIX}_dev_redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - CHUNK_LENGTH_MS=${CHUNK_LENGTH_MS}
+      - QUEUE_DIR=/queue
+      - STEMS_DIR=/stems
+      - LOGS_DIR=/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      retries: 3
+
+  ${STACK_PREFIX}_dev_packager:
+    build: ./packager
+    container_name: ${STACK_PREFIX}_dev_packager
+    depends_on:
+      ${STACK_PREFIX}_dev_splitter:
+        condition: service_healthy
+      ${STACK_PREFIX}_dev_redis:
+        condition: service_healthy
+    volumes:
+      - ${STACK_PREFIX}_stems:/stems
+      - ${STACK_PREFIX}_metadata_json:/metadata/json
+      - ${STACK_PREFIX}_output:/output
+      - ./shared:/app/shared:ro
+    environment:
+      - REDIS_HOST=${STACK_PREFIX}_dev_redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - STEMS_DIR=/stems
+      - META_DIR=/metadata/json
+      - OUTPUT_DIR=/output
+      - LOGS_DIR=/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      retries: 3
+
+  ${STACK_PREFIX}_dev_organizer:
+    build: ./organizer
+    container_name: ${STACK_PREFIX}_dev_organizer
+    depends_on:
+      ${STACK_PREFIX}_dev_packager:
+        condition: service_healthy
+      ${STACK_PREFIX}_dev_redis:
+        condition: service_healthy
+    volumes:
+      - ${STACK_PREFIX}_output:/output
+      - ${STACK_PREFIX}_organized:/organized
+      - ${STACK_PREFIX}_metadata_json:/metadata/json
+      - ./shared:/app/shared:ro
+    environment:
+      - REDIS_HOST=${STACK_PREFIX}_dev_redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - OUTPUT_DIR=/output
+      - ORG_DIR=/organized
+      - META_DIR=/metadata/json
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOGS_DIR=/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      retries: 3
+
+  ${STACK_PREFIX}_dev_status_api:
+    build: ./status-api
+    container_name: ${STACK_PREFIX}_dev_status_api
+    depends_on:
+      ${STACK_PREFIX}_dev_organizer:
+        condition: service_healthy
+      ${STACK_PREFIX}_dev_redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5001:5001"
+    volumes:
+      - ${STACK_PREFIX}_input:/input
+      - ${STACK_PREFIX}_queue:/queue
+      - ${STACK_PREFIX}_metadata_json:/metadata/json
+      - ${STACK_PREFIX}_stems:/stems
+      - ${STACK_PREFIX}_output:/output
+      - ${STACK_PREFIX}_organized:/organized
+      - ./shared:/app/shared:ro
+    environment:
+      - REDIS_HOST=${STACK_PREFIX}_dev_redis
+      - LOG_LEVEL=${LOG_LEVEL}
+      - INPUT_DIR=/input
+      - QUEUE_DIR=/queue
+      - META_DIR=/metadata/json
+      - STEMS_DIR=/stems
+      - OUTPUT_DIR=/output
+      - ORG_DIR=/organized
+      - LOGS_DIR=/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      retries: 3
+
+  ${STACK_PREFIX}_dev_maintenance:
+    build: ./maintenance
+    container_name: ${STACK_PREFIX}_dev_maintenance
+    depends_on:
+      ${STACK_PREFIX}_dev_redis:
+        condition: service_healthy
+    volumes:
+      - ${STACK_PREFIX}_metadata_json:/metadata/json
+      - ${STACK_PREFIX}_stems:/stems
+      - ${STACK_PREFIX}_output:/output
+      - ${STACK_PREFIX}_queue:/queue
+      - ${STACK_PREFIX}_organized:/organized
+      - ./shared:/app/shared:ro
+    environment:
+      - REDIS_HOST=${STACK_PREFIX}_dev_redis
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - CLEANUP_CRON_SCHEDULE=${CLEANUP_CRON_SCHEDULE}
+      - LOGS_DIR=/logs
+
+  ${STACK_PREFIX}_dev_telegram_youtube_bot:
+    build: ./telegram_youtube_bot
+    container_name: ${STACK_PREFIX}_dev_telegram_youtube_bot
+    depends_on:
+      ${STACK_PREFIX}_dev_redis:
+        condition: service_healthy
+    volumes:
+      - ${STACK_PREFIX}_input:/input
+      - ${STACK_PREFIX}_metadata_json:/metadata/json
+      - ./shared:/app/shared:ro
+      - type: bind
+        source: ${YT_DLP_COOKIES_DIR:-./cookies}
+        target: /cookies
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - YTDLP_OUTPUT_DIR=/input
+      - METADATA_OUTPUT_DIR=/metadata/json
+      - LOG_LEVEL=${LOG_LEVEL}
+      - YT_DLP_COOKIES_FILE=${YT_DLP_COOKIES_FILE:-/cookies/cookies.txt}
+
+# -------------------------------
+# Named Volumes
+# -------------------------------
+volumes:
+  ${STACK_PREFIX}_input:
+  ${STACK_PREFIX}_queue:
+  ${STACK_PREFIX}_stems:
+  ${STACK_PREFIX}_output:
+  ${STACK_PREFIX}_organized:
+  ${STACK_PREFIX}_splitter_tmp:
+  ${STACK_PREFIX}_metadata_json:
+
+# Optionally add for persistent logs:
+#  ${STACK_PREFIX}_logs:

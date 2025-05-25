@@ -17,15 +17,29 @@ from shared.pipeline_utils import (
 import traceback
 import datetime
 
-# --- Config: set via ENV or defaults ---
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+LEVELS = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+    "HEALTH": logging.INFO,
+}
+
+logging.basicConfig(
+    level=LEVELS.get(LOG_LEVEL, logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
+logger.info(f"Logging initialized at {LOG_LEVEL} level")
+
 QUEUE_DIR = os.environ.get("QUEUE_DIR", "/queue")
 STEMS_DIR = os.environ.get("STEMS_DIR", "/stems")
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", 3))
-RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 10))  # seconds
-CHUNK_LENGTH_MS = int(os.environ.get("CHUNK_LENGTH_MS", 30000))  # ms
-
-logging.basicConfig(level=logging.INFO)
-
+RETRY_DELAY = int(os.environ.get("RETRY_DELAY", 10))
+CHUNK_LENGTH_MS = int(os.environ.get("CHUNK_LENGTH_MS", 30000))
 
 def process_file(file_path, song_name):
     """Split an MP3 into stems in chunks, merge results, write output."""
@@ -83,7 +97,6 @@ def process_file(file_path, song_name):
             else:
                 return str(e)
 
-
 def main():
     while True:
         files = get_files_by_status("metadata_extracted")
@@ -124,7 +137,6 @@ def main():
                 )
                 redis_client.incr(f"splitter_retries:{file}")
         time.sleep(5)
-
 
 if __name__ == "__main__":
     main()

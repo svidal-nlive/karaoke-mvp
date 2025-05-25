@@ -19,7 +19,8 @@ RUN addgroup --gid 1000 appgroup && \
 USER appuser
 
 EXPOSE 5000
-# Optional: Add a healthcheck (if you want Docker-native health status)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD curl -f http://localhost:5000/health || exit 1
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:5000/health || exit 1
 
 CMD ["python", "splitter.py"]

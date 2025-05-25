@@ -1,0 +1,24 @@
+services:
+  ${STACK_PREFIX}_deemix:
+    networks:
+      - ${BACKEND_NETWORK}
+
+  ${STACK_PREFIX}_jellyfin:
+    networks:
+      - ${BACKEND_NETWORK}
+
+  ${STACK_PREFIX}_prometheus:
+    networks:
+      - ${BACKEND_NETWORK}
+
+  ${STACK_PREFIX}_alertmanager:
+    networks:
+      - ${BACKEND_NETWORK}
+
+  ${STACK_PREFIX}_grafana:
+    networks:
+      - ${BACKEND_NETWORK}
+
+networks:
+  ${BACKEND_NETWORK}:
+    external: true

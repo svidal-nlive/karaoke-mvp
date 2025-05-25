@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  tunnel:
+    container_name: karaoke_tunnel
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    networks:
+      - backend
+
+networks:
+  backend:
+    name: backend
+    driver: bridge
+    external: false   # Will auto-create if not exists, or set true and create it manually.
