@@ -1,0 +1,13 @@
+# .yamllint
+extends: default   # start from yamllint's built-in "default" preset
+
+rules:
+  line-length:
+    max: 235       # allow up to 235 chars instead of the default 80
+    allow-non-breakable-words: true   # don’t complain about long URLs
+    level: warning                    # make it a warning (optional)
+
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+  # You can selectively disable other rules, e.g.:
+  # comments-indentation: disable
