@@ -6,6 +6,9 @@
 # - Sends Telegram notifications on success/failure
 # - Runs nightly scheduled builds for freshness
 
+# .github/workflows/docker-multi-build.yml
+# CI/CD for Karaoke-MVP: Multi-service Docker build/push, with Telegram alerts and .env auto-generation
+
 name: Build and Push Docker Images
 
 on:
@@ -20,91 +23,9 @@ env:
   DOCKERHUB_USER: nlivestudent
 
 jobs:
-
-  # ----------------------
-  # 🛠️ Preflight Checks
-  # ----------------------
-  preflight-check:
-    name: Preflight Check (${{ matrix.service }})
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service:
-          - watcher
-          - metadata
-          - splitter
-          - packager
-          - organizer
-          - status-api
-          - maintenance
-          - telegram_youtube_bot
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Validate .env file exists
-        run: |
-          if [ ! -f .env ]; then
-            echo "❌ Missing .env file"
-            exit 1
-          fi
-          echo "✅ .env file present"
-
-      - name: Validate Dockerfile exists
-        run: |
-          DOCKERFILE="${{ matrix.service }}/Dockerfile"
-          if [ ! -f "$DOCKERFILE" ]; then
-            echo "❌ Dockerfile not found for ${{ matrix.service }}"
-            exit 1
-          fi
-          echo "✅ Dockerfile exists for ${{ matrix.service }}"
-
-      - name: Check Docker target 'final'
-        id: targetcheck
-        run: |
-          if grep -qi "FROM .* as final" "${{ matrix.service }}/Dockerfile"; then
-            echo "target_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "target_exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Docker Build Dry-run
-        run: |
-          TARGET=""
-          if [[ "${{ steps.targetcheck.outputs.target_exists }}" == "true" ]]; then
-            TARGET="--target final"
-          fi
-          docker buildx build \
-            --load \
-            --progress=plain \
-            $TARGET \
-            -f "${{ matrix.service }}/Dockerfile" \
-            "./${{ matrix.service }}"
-
-      - name: Telegram Notify Success
-        if: success()
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-          -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-          -d text="✅ Preflight checks passed for *${{ matrix.service }}* on commit [${{ github.sha }}]." \
-          -d parse_mode=Markdown
-
-      - name: Telegram Notify Failure
-        if: failure()
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-          -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-          -d text="❌ Preflight checks failed for *${{ matrix.service }}* on commit [${{ github.sha }}]. Please check workflow logs." \
-          -d parse_mode=Markdown
-
-  # -----------------------
-  # 🧹 Lint & Test Python
-  # -----------------------
   lint-and-test:
-    name: Lint & Test Python (${{ matrix.service }})
+    name: Lint & Test Python
     runs-on: ubuntu-latest
-    needs: preflight-check
     strategy:
       matrix:
         service:
@@ -120,6 +41,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # --- Generate .env from secrets ---
+      - name: Generate .env from GitHub Secrets (CI only)
+        run: |
+          echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" > .env
+          echo "DOCKERHUB_TOKEN=${{ secrets.DOCKERHUB_TOKEN }}" >> .env
+          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env
+          echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> .env
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -133,15 +62,20 @@ jobs:
       - name: Lint with flake8
         run: flake8 ${{ matrix.service }}/
 
-      # Uncomment to run pytest when ready
+      # Uncomment to run tests, if present
       # - name: Run tests
       #   run: pytest ${{ matrix.service }}/
 
-  # -----------------------------
-  # 🚀 Build and Push Images
-  # -----------------------------
+      # ---- Telegram notification on failure ----
+      - name: Notify Failure (Telegram)
+        if: failure()
+        run: |
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          -d text="❌ Lint/Test failed for ${{ matrix.service }} on branch ${{ github.ref }} (${GITHUB_WORKFLOW})"
+
   build-and-push:
-    name: Build & Push Docker (${{ matrix.service }})
+    name: Build & Push Docker Images
     runs-on: ubuntu-latest
     needs: lint-and-test
     strategy:
@@ -159,6 +93,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # --- Generate .env from secrets ---
+      - name: Generate .env from GitHub Secrets (CI only)
+        run: |
+          echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" > .env
+          echo "DOCKERHUB_TOKEN=${{ secrets.DOCKERHUB_TOKEN }}" >> .env
+          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env
+          echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> .env
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -168,14 +110,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Log in to GHCR
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract git tag (if any)
+      - name: Extract git tag (if available)
+        id: extract_tag
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
@@ -184,7 +127,7 @@ jobs:
           fi
           echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
 
-      - name: Build & Push
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -197,18 +140,61 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:latest
           platforms: linux/amd64,linux/arm64
 
-      - name: Telegram Notify Success
+      # Health check for services exposing HTTP APIs on port 5000
+      - name: Health check (port 5000)
+        if: |
+          matrix.service == 'metadata' ||
+          matrix.service == 'watcher' ||
+          matrix.service == 'organizer'
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/karaoke-${{ matrix.service }}:${{ env.IMAGE_TAG }}
+          docker run -d --rm -p 5000:5000 --name temp_test $IMAGE
+          for i in {1..10}; do
+            if curl -s http://localhost:5000/health; then
+              echo "Healthcheck passed."
+              docker rm -f temp_test >/dev/null 2>&1 || true
+              exit 0
+            fi
+            echo "Waiting for service on port 5000... ($i/10)"
+            sleep 1
+          done
+          echo "Health check failed after waiting. Dumping logs:"
+          docker logs temp_test || true
+          docker rm -f temp_test >/dev/null 2>&1 || true
+          exit 1
+
+      # Health check for status-api (port 5001)
+      - name: Health check (status-api on port 5001)
+        if: matrix.service == 'status-api'
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/karaoke-status-api:${{ env.IMAGE_TAG }}
+          docker run -d --rm -p 5001:5001 --name temp_test_status $IMAGE
+          for i in {1..10}; do
+            if curl -s http://localhost:5001/health; then
+              echo "Healthcheck passed."
+              docker rm -f temp_test_status >/dev/null 2>&1 || true
+              exit 0
+            fi
+            echo "Waiting for status-api on port 5001... ($i/10)"
+            sleep 1
+          done
+          echo "Health check failed after waiting. Dumping logs:"
+          docker logs temp_test_status || true
+          docker rm -f temp_test_status >/dev/null 2>&1 || true
+          exit 1
+
+      # ---- Telegram notification on success ----
+      - name: Notify Success (Telegram)
         if: success()
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-          -d text="✅ Docker image built & pushed: *${{ matrix.service }}* as *${{ env.IMAGE_TAG }}*" \
-          -d parse_mode=Markdown
+          -d text="✅ Docker image ${{ matrix.service }} built and pushed as ${{ env.IMAGE_TAG }} on branch ${{ github.ref }} (${GITHUB_WORKFLOW})"
 
-      - name: Telegram Notify Failure
+      # ---- Telegram notification on failure ----
+      - name: Notify Failure (Telegram)
         if: failure()
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-          -d text="❌ Docker build/push failed for *${{ matrix.service }}*. Check workflow logs." \
-          -d parse_mode=Markdown
+          -d text="❌ Build or push failed for ${{ matrix.service }} on branch ${{ github.ref }} (${GITHUB_WORKFLOW})"
